@@ -60,3 +60,12 @@
 17. The platform must not contain knowledge of concrete domain entities.
 
 18. Integration between platform and application happens only through explicit configuration/extension points.
+
+19. Runtime extension point (`src/runtime`):
+
+    * Applications supply an `AppConfig` (`name`, `version`, `dataApiVersion`) via `defineAppConfig`.
+    * Platform exposes reusable helpers only: `getVersionResponse(config)`, `getHealthResponse()`, `getPlatformVersion()`.
+    * Platform version is read from the platform `VERSION` file at runtime — never hard-coded and never taken from the application.
+    * HTTP routes are not part of the platform; host apps create thin route adapters that call these helpers.
+    * Platform must not embed concrete application names, versions, or domain knowledge.
+

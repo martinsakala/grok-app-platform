@@ -1,7 +1,7 @@
 {
-  "platformVersion": "0.1.1",
+  "platformVersion": "0.2.0",
   "appContractVersion": 1,
   "breaking": false,
-  "requiresAppChanges": false,
+  "requiresAppChanges": true,
   "requiresDatabaseMigration": false
 }

@@ -1,0 +1,18 @@
+{
+  "name": "grok-app-platform",
+  "private": true,
+  "type": "module",
+  "description": "Canonical shared platform layer for Grok Build applications",
+  "exports": {
+    "./runtime": "./src/runtime/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

@@ -6,3 +6,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# Tooling (platform tests/typecheck only)
+node_modules/
