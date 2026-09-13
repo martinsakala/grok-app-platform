@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   getDatabase,
@@ -213,5 +215,15 @@ describe("application and API migrations", () => {
     expect(
       (await db.query<{ id: number }>("select id from app.three")).rows.map((row) => row.id),
     ).toEqual([3]);
+  });
+});
+
+describe("PostgreSQL lock protocol", () => {
+  it("uses session-level pg_advisory_lock, not a transaction-scoped lock", () => {
+    const src = readFileSync(fileURLToPath(new URL("../src/database/migrations.ts", import.meta.url)), "utf8");
+    expect(src).toMatch(/select pg_advisory_lock\(\$1\)/);
+    expect(src).toMatch(/select pg_advisory_unlock\(\$1\)/);
+    expect(src).not.toMatch(/select pg_advisory_xact_lock/);
+    expect(src).toMatch(/resolveMigrationConnectionString/);
   });
 });

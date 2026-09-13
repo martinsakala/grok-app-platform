@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2
+- Migration runner uses a **session-capable** Postgres connection for `pg_advisory_lock`. Query traffic (`getDatabase()`, Better Auth, `getSql()`) still uses `DATABASE_URL` as injected.
+- A local `pg.Pool` to a real Postgres session preserves backend state across per-file COMMIT. A **transaction pooler** (Neon `-pooler` hostname, PgBouncer port 6543, `pgbouncer=true`) does not — `pg.Pool.connect()` there is not a Postgres session.
+- Supported direct URL for migrations, in order: `DATABASE_URL_UNPOOLED`, `DIRECT_URL`, `POSTGRES_URL_NON_POOLING`. Neon `*-pooler.*.neon.tech` is rewritten by removing that `-pooler` label only. Other hostnames are never rewritten. Detected non-Neon poolers without an explicit direct URL fail closed.
+- Public API `getDatabase` / `runMigrations` / auth helpers unchanged. `0002_auth.sql` unchanged. `requiresAppChanges=false`.
+- `scripts/prove-advisory-lock.mjs` runs two processes against a throwaway Postgres to prove the lock spans the inter-file gap and unlocks on success and error.
+
 ## 0.4.1
 - Preview database convergence: hosts inject Grok `getPglite()` via `setPgliteFactory`. Better Auth, Grok `getSql()`, and platform `getDatabase()` then share one PGlite. Public API `getDatabase` / `runMigrations` / `getDatabaseDiagnostics` is unchanged.
 - Native Grok `getSql()` is **not** the production adapter: it has no transactions, no multi-statement `exec`, and no held client, so it cannot keep a session-level `pg_advisory_lock` across per-file COMMIT. Production still uses the platform `pg` Pool (`withSession`) against the same `DATABASE_URL` Better Auth uses.

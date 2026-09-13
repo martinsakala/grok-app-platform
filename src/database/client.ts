@@ -36,6 +36,10 @@ export function getDatabaseEngineName(): DatabaseEngine {
  * Preview hosts should call `setPgliteFactory(() => getPglite())` first so
  * this singleton is Grok's Better Auth / `getSql()` instance, not a second WASM
  * Postgres.
+ *
+ * Production: this pool uses `DATABASE_URL` as injected (often a Neon pooled
+ * endpoint). That is correct for query traffic. `runMigrations` resolves a
+ * session-capable URL separately so `pg_advisory_lock` can outlive COMMIT.
  */
 export function getDatabase(): Promise<Database> {
   return getInternalDatabase();

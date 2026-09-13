@@ -34,8 +34,10 @@ const adapterRef = globalThis as typeof globalThis & {
  * Host → platform extension point. Call from server-only boot **before**
  * `getDatabase()` / `runMigrations()`. Pass Grok `() => getPglite()`.
  *
- * Ignored when `DATABASE_URL` is set (production uses the platform `pg` Pool
- * so migration `withSession` + session-level advisory locks still work).
+ * Ignored when `DATABASE_URL` is set (production query traffic uses the
+ * platform `pg` Pool on that URL). `runMigrations` may open a separate
+ * session-capable connection when `DATABASE_URL` is a transaction pooler.
+
  *
  * `undefined` restores the platform-owned in-process PGlite (tests / no host).
  */

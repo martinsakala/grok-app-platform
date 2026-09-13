@@ -126,15 +126,17 @@ before `getDatabase()` / `runMigrations()`.
 | | Preview (no `DATABASE_URL`) | Production |
 | --- | --- | --- |
 | Auth DB | Grok `getPglite()` | Injected `DATABASE_URL` Postgres (Better Auth `pg` Pool) |
-| Platform DB | **same** Grok PGlite (injected) | Platform `pg` Pool on the **same** `DATABASE_URL` |
+| Platform DB | **same** Grok PGlite (injected) | Platform `pg` Pool on the **same** `DATABASE_URL` for queries; `runMigrations` uses a session-capable URL when `DATABASE_URL` is pooled |
 | Persistence | Ephemeral — restart wipes users, sessions, and app rows | Durable |
 | Credentials | Baked preview client, zero env files | Deployer-injected `GROK_AUTH_*` / `BETTER_AUTH_*` |
 | Sign-in UX | Popup + bearer | Redirect + `__Host-` cookie |
 
-Production uses one PostgreSQL database and three pools (Better Auth, Grok
-`getSql()`, platform `getDatabase()`). That is one database, not one client.
-Platform keeps its own Pool so `withSession` + `pg_advisory_lock` survive
-per-file COMMIT. Grok `getSql()` cannot do that (see `docs/DATABASE.md`).
+Production uses one PostgreSQL database and three query pools (Better Auth, Grok
+`getSql()`, platform `getDatabase()`) on `DATABASE_URL`. That URL may be a
+transaction pooler. `runMigrations` uses a session-capable connection so
+`pg_advisory_lock` survives per-file COMMIT (see `docs/DATABASE.md`). Grok
+`getSql()` cannot hold a session.
+
 
 Preview auth/session persistence is disposable. Production PostgreSQL is
 persistent. Persistent PGlite is out of scope.

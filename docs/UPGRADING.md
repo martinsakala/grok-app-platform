@@ -8,6 +8,19 @@
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+## 0.4.2
+
+`breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion=2`.
+
+Migration advisory lock on a session-capable Postgres connection. Hosts that already run 0.4.1 need **no application code changes**.
+
+1. `git subtree pull --prefix=platform platform-upstream main --squash`.
+2. Optional: if production `DATABASE_URL` is a non-Neon transaction pooler, set `DATABASE_URL_UNPOOLED` (or `DIRECT_URL` / `POSTGRES_URL_NON_POOLING`) to a direct URL. Neon `*-pooler.*.neon.tech` is rewritten automatically by removing that label only — other hostnames are never rewritten.
+3. Keep `setPgliteFactory(() => getPglite())` from 0.4.1. Do not import host `src/lib/db.ts` from `/platform`.
+4. Do not edit `platform/migrations/private/0002_auth.sql`. Auth public API is unchanged.
+
+A local `pg.Pool` to Postgres preserves session locks. A transaction pooler does not. See `docs/DATABASE.md`.
+
 ## 0.4.1
 
 `breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=false`, `appContractVersion=2`.

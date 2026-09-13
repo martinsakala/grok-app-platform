@@ -1,6 +1,8 @@
 import { PLATFORM_MIGRATIONS } from "./generated/platform-migrations.js";
 import { getInternalDatabase } from "./client.js";
+import { resolveMigrationConnectionString } from "./connection-url.js";
 import { migrationChecksum } from "./checksum.js";
+import { readDatabaseUrl } from "./env.js";
 import { assertServerOnly } from "./server-guard.js";
 import type { InternalDatabase, Session, Tx } from "./internal.js";
 import type { MigrationKind, MigrationSource, RunMigrationsOptions } from "./types.js";
@@ -17,6 +19,11 @@ const MIGRATION_LOCK_KEY = 0x67726b31;
 const FILENAME_PATTERN = /^\d{4}_[A-Za-z0-9._-]+\.sql$/;
 
 type Queryable = Pick<Tx, "query">;
+
+const testHooks = globalThis as typeof globalThis & {
+  /** Test-only: runs after each committed file while the session lock is still held. */
+  __grokPlatformMigrateAfterFile__?: () => Promise<void>;
+};
 
 export function sortMigrations(migrations: readonly MigrationSource[]): MigrationSource[] {
   return [...migrations].sort((a, b) =>
@@ -105,6 +112,9 @@ async function applyKind(
       ]);
     });
     applied.set(migration.filename, checksum);
+    if (testHooks.__grokPlatformMigrateAfterFile__) {
+      await testHooks.__grokPlatformMigrateAfterFile__();
+    }
   }
 }
 
@@ -118,29 +128,49 @@ async function applyAll(session: Session, options: RunMigrationsOptions): Promis
   }
 }
 
-async function runAll(db: InternalDatabase, options: RunMigrationsOptions = {}): Promise<void> {
-  await db.withSession(async (session) => {
-    if (db.engine !== "postgresql") {
-      await applyAll(session, options);
-      return;
-    }
+async function withMigrationLock(session: Session, options: RunMigrationsOptions): Promise<void> {
+  // Session-level lock: survives each file's COMMIT. A transaction-scoped
+  // lock (`pg_advisory_xact_lock`) would be released between files.
+  await session.query("select pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+  let applyError: unknown;
+  try {
+    await applyAll(session, options);
+  } catch (error) {
+    applyError = error;
+  }
+  try {
+    await session.query("select pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]);
+  } catch (unlockError) {
+    if (!applyError) throw unlockError;
+  }
+  if (applyError) throw applyError;
+}
 
-    // Session-level lock: survives each file's COMMIT. A transaction-scoped
-    // lock (`pg_advisory_xact_lock`) would be released between files.
-    await session.query("select pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
-    let applyError: unknown;
-    try {
+async function runAll(queryDb: InternalDatabase, options: RunMigrationsOptions = {}): Promise<void> {
+  if (queryDb.engine !== "postgresql") {
+    await queryDb.withSession(async (session) => {
       await applyAll(session, options);
-    } catch (error) {
-      applyError = error;
-    }
-    try {
-      await session.query("select pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]);
-    } catch (unlockError) {
-      if (!applyError) throw unlockError;
-    }
-    if (applyError) throw applyError;
-  });
+    });
+    return;
+  }
+
+  const queryUrl = readDatabaseUrl();
+  if (!queryUrl) {
+    throw new Error("PostgreSQL engine selected without DATABASE_URL");
+  }
+  const migrationUrl = resolveMigrationConnectionString(queryUrl);
+  let lockDb = queryDb;
+  let owned = false;
+  if (migrationUrl !== queryUrl) {
+    const { createPostgresDatabase } = await import("./postgres.js");
+    lockDb = createPostgresDatabase(migrationUrl, { max: 1 });
+    owned = true;
+  }
+  try {
+    await lockDb.withSession((session) => withMigrationLock(session, options));
+  } finally {
+    if (owned) await lockDb.close();
+  }
 }
 
 const migrateRef = globalThis as typeof globalThis & {
@@ -173,6 +203,12 @@ function enqueue(work: () => Promise<void>): Promise<void> {
  * runners across processes, servers, and serverless isolates connected to the
  * **same PostgreSQL server/database**. It is not process-local. It does not
  * coordinate a different database or a different PostgreSQL server.
+ *
+ * The lock requires a **session-capable** connection (local `pg.Pool` to
+ * Postgres, Neon direct hostname, or `DATABASE_URL_UNPOOLED` / `DIRECT_URL` /
+ * `POSTGRES_URL_NON_POOLING`). A transaction pooler (Neon `-pooler`, PgBouncer
+ * port 6543) does not preserve the backend across per-file COMMIT. Query
+ * traffic via `getDatabase()` may still use the pooled `DATABASE_URL`.
  *
  * PGlite: process-local queue only (no advisory lock). Preview/dev is a
  * single in-process database.

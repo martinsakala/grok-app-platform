@@ -4,15 +4,30 @@ import { toQueryResult, type InternalDatabase, type Session, type Tx } from "./i
 
 const { Pool } = pg;
 
+export type PostgresDatabaseOptions = {
+  /** Pool size. Query traffic uses 4; the migration runner uses 1. */
+  max?: number;
+};
+
 /**
  * node-postgres (`pg`) — already present in Grok Build hosts, small API,
  * parameterized queries, TLS via the connection string (`sslmode=`), and a
  * tiny pool that is serverless-friendly (warm instances reuse it).
+ *
+ * `pool.connect()` holds a client of this Pool. That preserves a backend
+ * session only when the connection string is a **direct** Postgres endpoint.
+ * A transaction pooler (Neon `-pooler` / PgBouncer port 6543) returns the
+ * backend after COMMIT, so session-level `pg_advisory_lock` does not survive
+ * the inter-file gap. The migration runner therefore uses a session-capable
+ * URL (see `resolveMigrationConnectionString`). Query traffic may stay pooled.
  */
-export function createPostgresDatabase(connectionString: string): InternalDatabase {
+export function createPostgresDatabase(
+  connectionString: string,
+  options: PostgresDatabaseOptions = {},
+): InternalDatabase {
   const pool = new Pool({
     connectionString,
-    max: 4,
+    max: options.max ?? 4,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 15_000,
     allowExitOnIdle: true,
@@ -65,8 +80,9 @@ export function createPostgresDatabase(connectionString: string): InternalDataba
     /**
      * Hold one pool client for the duration of `fn`. Session-level state
      * (advisory locks) is preserved across the per-file transactions that
-     * `fn` opens on this client. On error the client is destroyed rather
-     * than returned to the pool, so a leftover session lock cannot leak.
+     * `fn` opens on this client **only if** the pool talks to a real Postgres
+     * session, not a transaction pooler. On error the client is destroyed
+     * rather than returned to the pool, so a leftover session lock cannot leak.
      */
     async withSession<T>(fn: (session: Session) => Promise<T>): Promise<T> {
       const client = await pool.connect();

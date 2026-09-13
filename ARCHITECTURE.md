@@ -79,7 +79,8 @@
     * Application and API SQL is passed in as `{ filename, sql }` (Vite `?raw` or a generated manifest). No runtime filesystem lookup of SQL files.
     * Downstream apps must not patch platform DB implementation; capability changes happen upstream.
     * `setPgliteFactory(() => getPglite())` is the host → platform adapter so preview uses Grok's PGlite (shared with Better Auth). Platform never imports host `src/lib/db.ts`.
-    * Production keeps the platform `pg` Pool: Grok `getSql()` cannot provide `withSession` or a session-level advisory lock. Better Auth, `getSql()`, and platform still share one `DATABASE_URL`.
+    * Production query traffic uses the platform `pg` Pool on `DATABASE_URL` (often a Neon pooled endpoint). `runMigrations` resolves a session-capable URL (`DATABASE_URL_UNPOOLED` / Neon `-pooler` rewrite) so `pg_advisory_lock` can outlive per-file COMMIT. Grok `getSql()` cannot provide `withSession` or a session-level advisory lock.
+
 
 21. Auth extension point (`src/auth`):
 

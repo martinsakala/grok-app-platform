@@ -41,6 +41,8 @@ root host glue = host-owned
 * Do not import the runtime barrel from client components if that would pull `getHealthResponse` / database into the browser bundle.
 * Hosts must call `setPgliteFactory(() => getPglite())` from server-only boot **before** `getDatabase()` / `runMigrations()`, so preview Better Auth and platform share Grok's PGlite. Do not import host `src/lib/db.ts` from `/platform`.
 * Do not replace the production `pg` Pool with Grok `getSql()`: `getSql()` cannot hold a session across per-file transactions or take a session-level advisory lock.
+* Production `DATABASE_URL` may be a transaction pooler (Neon `-pooler`). `runMigrations` must use a session-capable URL (`DATABASE_URL_UNPOOLED` / `DIRECT_URL` / `POSTGRES_URL_NON_POOLING`, or the documented Neon `-pooler` hostname rewrite). Do not blindly rewrite other hostnames. A local `pg.Pool` is not a Postgres session when the URL is pooled.
+
 
 ## Auth rules
 

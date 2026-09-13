@@ -50,13 +50,44 @@ Postgres. Without the factory, platform creates a private PGlite (tests /
 legacy hosts) — `getAuthDiagnostics().schemaReady` would then describe that
 private instance, not Better Auth.
 
-## Production: one Postgres, platform-owned Pool
+## Production: one Postgres, two connection roles
 
 ```
 Better Auth  ── pg Pool ─┐
-getSql()     ── pg Pool ─┼── DATABASE_URL
-getDatabase()── pg Pool ─┘  (withSession + pg_advisory_lock)
+getSql()     ── pg Pool ─┼── DATABASE_URL          (query traffic; may be pooled)
+getDatabase()── pg Pool ─┘
+
+runMigrations ── dedicated session-capable URL
+                 DATABASE_URL_UNPOOLED / DIRECT_URL / POSTGRES_URL_NON_POOLING
+                 or Neon rewrite of *-pooler.*.neon.tech
+                 then withSession + pg_advisory_lock
 ```
+
+### Local `pg.Pool` vs a transaction pooler
+
+`node-postgres` `Pool.connect()` holds a **client of that pool**. What that client is depends on the URL:
+
+| URL | What `pool.connect()` holds | Session-level `pg_advisory_lock` across COMMIT |
+| --- | --- | --- |
+| Direct Postgres (`localhost`, RDS, Neon hostname **without** `-pooler`, port 5432) | A real backend session | **Yes** — lock survives per-file COMMIT on that client |
+| Transaction pooler (Neon `ep-…-pooler.*.neon.tech`, PgBouncer port **6543**, `pgbouncer=true`) | A client TCP connection **to the pooler** | **No** — after COMMIT the backend is returned; the lock leaks on the old backend and the next file is not serialized |
+
+Grok's neon skill states that the deployed `DATABASE_URL` is Neon and that **Neon's pooled endpoint keeps no session state** (`SET`, `LISTEN/NOTIFY`, session advisory locks). Grok `src/lib/db.ts` comments that `pg` "works directly with Neon's pooled endpoint". A local `pg.Pool` against that URL is therefore **not** a Postgres session.
+
+Do **not** unify production through `getSql()`: it has no `exec`, no transaction, and no held client.
+
+### How migrations get a direct connection
+
+The runner never rewrites an arbitrary hostname.
+
+1. If `DATABASE_URL_UNPOOLED`, `DIRECT_URL`, or `POSTGRES_URL_NON_POOLING` is set (non-whitespace), use the first of those. If that value itself classifies as a transaction pooler, fail closed.
+2. Else if `DATABASE_URL` is a Neon pooled host (`*.neon.tech` with a hostname label ending in `-pooler`), rewrite **only that label** (documented Neon convention: `ep-x-pooler.region.aws.neon.tech` → `ep-x.region.aws.neon.tech`). Port, userinfo, path, and query stay as-is.
+3. Else if `DATABASE_URL` is unclassified or Neon-direct, use it (local Postgres, RDS, …).
+4. Else fail closed (detected non-Neon pooler, no explicit direct URL).
+
+Never log the URL, hostname, username, or password.
+
+Query pools (`getDatabase()`, Better Auth, `getSql()`) stay on `DATABASE_URL`. Only `runMigrations` opens a session-capable connection.
 
 ## Production bundling (PGlite assets)
 
@@ -138,8 +169,10 @@ Each migration **file** is its own transaction (file SQL + history insert). A fa
 
 **PostgreSQL** holds one **session-level** advisory lock (`pg_advisory_lock`) for the whole run and releases it in `finally`. That lock serializes migration runners across processes, hosts, and serverless isolates **connected to the same PostgreSQL server/database**. It is not process-local. A transaction-scoped lock cannot be used: it would be released between per-file commits.
 
+That lock is taken on a **session-capable** connection (see Production above). A `pg.Pool` against a transaction pooler is not enough.
+
 **PGlite** uses only the process-local queue (no advisory lock).
 
 ## Public API contract
 
-`getDatabase`, `runMigrations` options, `AppConfig`, and health/version payloads are unchanged in 0.4.1. Hosts that want a shared preview database add `setPgliteFactory` (app contract 2, `requiresAppChanges=true`, no new SQL file).
+`getDatabase`, `runMigrations` options, `AppConfig`, and health/version payloads are unchanged in 0.4.2. Hosts that already call `setPgliteFactory` from 0.4.1 need no code change (`requiresAppChanges=false`). Optional: set `DATABASE_URL_UNPOOLED` when the injector cannot provide a Neon `-pooler` hostname.

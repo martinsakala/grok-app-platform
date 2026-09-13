@@ -37,9 +37,17 @@ Concurrent callers **in one process** share a process-local queue (PGlite and Po
 
 That advisory lock coordinates **all sessions connected to the same PostgreSQL server/database** — other processes, other hosts, and serverless isolates that share the database. It is **not** process-local. It does **not** coordinate a different database or a different PostgreSQL server.
 
+The lock is taken on a **session-capable** connection:
+
+* A local `pg.Pool` to real Postgres (`localhost`, RDS, Neon **without** `-pooler`) holds a backend session; `pg_advisory_lock` survives per-file COMMIT.
+* A **transaction pooler** (Neon `*-pooler.*.neon.tech`, PgBouncer port 6543) does not. After COMMIT the backend is returned; a session lock leaks and does not cover the next file.
+
+`runMigrations` therefore resolves a direct URL (`DATABASE_URL_UNPOOLED` / `DIRECT_URL` / `POSTGRES_URL_NON_POOLING`, or the documented Neon `-pooler` hostname rewrite). It does not blindly rewrite other hostnames. Query traffic may keep using the pooled `DATABASE_URL`. `scripts/prove-advisory-lock.mjs` is the two-process proof (throwaway DB only).
+
 **PGlite** has no advisory lock. Preview/dev is a single in-process database; only the process-local queue serializes callers.
 
 Do not run this runner through Grok `getSql()`: that API has no held client, so the session-level lock cannot outlive per-file COMMIT.
+
 
 ## Production bundling
 
