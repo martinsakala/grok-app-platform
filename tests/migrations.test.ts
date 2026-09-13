@@ -104,7 +104,7 @@ describe("application and API migrations", () => {
     expect(ids.rows.map((row) => row.id)).toEqual([1, 2]);
   });
 
-  it("rolls back a failed application migration without recording it", async () => {
+  it("commits earlier files and rolls back only the failed migration file", async () => {
     await runMigrations();
     await expect(
       runMigrations({
@@ -117,13 +117,101 @@ describe("application and API migrations", () => {
 
     const db = await getDatabase();
     const appHistory = await db.query<{ filename: string }>(
-      "select filename from private.application_migrations",
+      "select filename from private.application_migrations order by filename",
     );
-    expect(appHistory.rows).toHaveLength(0);
+    expect(appHistory.rows.map((row) => row.filename)).toEqual(["0001_ok.sql"]);
 
-    const exists = await db.query<{ exists: boolean }>(
+    const ok = await db.query<{ exists: boolean }>(
       "select to_regclass('app.ok') is not null as exists",
     );
-    expect(exists.rows[0]?.exists).toBe(false);
+    expect(ok.rows[0]?.exists).toBe(true);
+
+    const bad = await db.query<{ exists: boolean }>(
+      "select to_regclass('app.missing_syntax') is not null as exists",
+    );
+    expect(bad.rows[0]?.exists).toBe(false);
+  });
+
+  it("rolls back only the failed file, skips later files, and resumes from the first unapplied migration", async () => {
+    await runMigrations();
+
+    const m1 = {
+      filename: "0001_ok.sql",
+      sql: "create table app.one (id integer primary key); insert into app.one(id) values (1);",
+    };
+    const m2Fail = {
+      filename: "0002_partial.sql",
+      sql: "create table app.two (id integer primary key); insert into app.two(id) values (1); insert into app.two_does_not_exist(id) values (1);",
+    };
+    const m2Ok = {
+      filename: "0002_partial.sql",
+      sql: "create table app.two (id integer primary key); insert into app.two(id) values (1);",
+    };
+    const m3 = {
+      filename: "0003_later.sql",
+      sql: "create table app.three (id integer primary key); insert into app.three(id) values (3);",
+    };
+
+    await expect(
+      runMigrations({ applicationMigrations: [m1, m2Fail, m3] }),
+    ).rejects.toThrow();
+
+    const db = await getDatabase();
+
+    const history = await db.query<{ filename: string }>(
+      "select filename from private.application_migrations order by filename",
+    );
+    expect(history.rows.map((row) => row.filename)).toEqual(["0001_ok.sql"]);
+
+    const one = await db.query<{ exists: boolean }>(
+      "select to_regclass('app.one') is not null as exists",
+    );
+    expect(one.rows[0]?.exists).toBe(true);
+    const oneRows = await db.query<{ id: number }>("select id from app.one");
+    expect(oneRows.rows.map((row) => row.id)).toEqual([1]);
+
+    const two = await db.query<{ exists: boolean }>(
+      "select to_regclass('app.two') is not null as exists",
+    );
+    expect(two.rows[0]?.exists).toBe(false);
+
+    const three = await db.query<{ exists: boolean }>(
+      "select to_regclass('app.three') is not null as exists",
+    );
+    expect(three.rows[0]?.exists).toBe(false);
+
+    await expect(
+      runMigrations({ applicationMigrations: [m1, m2Fail, m3] }),
+    ).rejects.toThrow();
+
+    const historyRetry = await db.query<{ filename: string }>(
+      "select filename from private.application_migrations order by filename",
+    );
+    expect(historyRetry.rows.map((row) => row.filename)).toEqual(["0001_ok.sql"]);
+    const threeRetry = await db.query<{ exists: boolean }>(
+      "select to_regclass('app.three') is not null as exists",
+    );
+    expect(threeRetry.rows[0]?.exists).toBe(false);
+
+    await runMigrations({ applicationMigrations: [m1, m2Ok, m3] });
+
+    const historyAfter = await db.query<{ filename: string }>(
+      "select filename from private.application_migrations order by filename",
+    );
+    expect(historyAfter.rows.map((row) => row.filename)).toEqual([
+      "0001_ok.sql",
+      "0002_partial.sql",
+      "0003_later.sql",
+    ]);
+
+    expect((await db.query<{ id: number }>("select id from app.one")).rows.map((row) => row.id)).toEqual([
+      1,
+    ]);
+    expect((await db.query<{ id: number }>("select id from app.two")).rows.map((row) => row.id)).toEqual([
+      1,
+    ]);
+    expect(
+      (await db.query<{ id: number }>("select id from app.three")).rows.map((row) => row.id),
+    ).toEqual([3]);
   });
 });

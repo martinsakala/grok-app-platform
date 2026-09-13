@@ -2,7 +2,7 @@ import { PLATFORM_MIGRATIONS } from "./generated/platform-migrations.js";
 import { getInternalDatabase } from "./client.js";
 import { migrationChecksum } from "./checksum.js";
 import { assertServerOnly } from "./server-guard.js";
-import type { InternalDatabase, Tx } from "./internal.js";
+import type { InternalDatabase, Session, Tx } from "./internal.js";
 import type { MigrationKind, MigrationSource, RunMigrationsOptions } from "./types.js";
 
 const HISTORY_TABLE: Record<MigrationKind, string> = {
@@ -61,13 +61,18 @@ async function loadApplied(tx: Queryable, kind: MigrationKind): Promise<Map<stri
   return new Map(result.rows.map((row) => [row.filename, row.checksum]));
 }
 
+/**
+ * Apply one kind's files in filename order. Each unapplied file runs in its
+ * own transaction together with the history insert. Checksum mismatches on
+ * already-applied files abort the run before later files start.
+ */
 async function applyKind(
-  tx: Tx,
+  session: Session,
   kind: MigrationKind,
   migrations: readonly MigrationSource[],
 ): Promise<void> {
   const ordered = sortMigrations(migrations);
-  const applied = await loadApplied(tx, kind);
+  const applied = await loadApplied(session, kind);
 
   for (const migration of ordered) {
     assertMigrationFilename(migration.filename);
@@ -83,36 +88,58 @@ async function applyKind(
       continue;
     }
 
-    await tx.exec(migration.sql);
+    await session.transaction(async (tx) => {
+      await tx.exec(migration.sql);
 
-    const table = HISTORY_TABLE[kind];
-    if (kind === "platform" && !(await relationExists(tx, table))) {
-      throw new Error(
-        `Platform migration ${migration.filename} did not create ${table}; ` +
-          `the first platform migration must create schemas and history tables.`,
-      );
-    }
+      const table = HISTORY_TABLE[kind];
+      if (kind === "platform" && !(await relationExists(tx, table))) {
+        throw new Error(
+          `Platform migration ${migration.filename} did not create ${table}; ` +
+            `the first platform migration must create schemas and history tables.`,
+        );
+      }
 
-    await tx.query(`insert into ${table} (filename, checksum) values ($1, $2)`, [
-      migration.filename,
-      checksum,
-    ]);
+      await tx.query(`insert into ${table} (filename, checksum) values ($1, $2)`, [
+        migration.filename,
+        checksum,
+      ]);
+    });
     applied.set(migration.filename, checksum);
   }
 }
 
+async function applyAll(session: Session, options: RunMigrationsOptions): Promise<void> {
+  await applyKind(session, "platform", PLATFORM_MIGRATIONS);
+  if (options.applicationMigrations) {
+    await applyKind(session, "application", options.applicationMigrations);
+  }
+  if (options.apiMigrations) {
+    await applyKind(session, "api", options.apiMigrations);
+  }
+}
+
 async function runAll(db: InternalDatabase, options: RunMigrationsOptions = {}): Promise<void> {
-  await db.transaction(async (tx) => {
-    if (db.engine === "postgresql") {
-      await tx.query("select pg_advisory_xact_lock($1)", [MIGRATION_LOCK_KEY]);
+  await db.withSession(async (session) => {
+    if (db.engine !== "postgresql") {
+      await applyAll(session, options);
+      return;
     }
-    await applyKind(tx, "platform", PLATFORM_MIGRATIONS);
-    if (options.applicationMigrations) {
-      await applyKind(tx, "application", options.applicationMigrations);
+
+    // Session-level lock: survives each file's COMMIT. A transaction-scoped
+    // lock (`pg_advisory_xact_lock`) would be released between files.
+    await session.query("select pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+    let applyError: unknown;
+    try {
+      await applyAll(session, options);
+    } catch (error) {
+      applyError = error;
     }
-    if (options.apiMigrations) {
-      await applyKind(tx, "api", options.apiMigrations);
+    try {
+      await session.query("select pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]);
+    } catch (unlockError) {
+      if (!applyError) throw unlockError;
     }
+    if (applyError) throw applyError;
   });
 }
 
@@ -134,11 +161,21 @@ function enqueue(work: () => Promise<void>): Promise<void> {
 /**
  * Apply platform migrations, then optional application and API migrations.
  * Safe to call repeatedly. Concurrent callers in one process share a queue.
- * Production PostgreSQL also takes a transaction-scoped advisory lock.
  *
- * Limits: advisory locks do not coordinate separate serverless isolates that
- * cannot see each other's sessions; hosts should still run migrations once at
- * boot. In-process queuing covers Grok preview + a single Node process.
+ * Each migration file is applied in its own transaction together with its
+ * history insert. A failed file rolls back only that file; previously
+ * committed files remain applied; later files are not started. A subsequent
+ * run resumes at the first unapplied file. Checksums of already-applied files
+ * are still verified.
+ *
+ * PostgreSQL: one session-level advisory lock (`pg_advisory_lock`) is held for
+ * the whole run and released in `finally`. That lock serializes concurrent
+ * runners across processes, servers, and serverless isolates connected to the
+ * **same PostgreSQL server/database**. It is not process-local. It does not
+ * coordinate a different database or a different PostgreSQL server.
+ *
+ * PGlite: process-local queue only (no advisory lock). Preview/dev is a
+ * single in-process database.
  */
 export function runMigrations(options: RunMigrationsOptions = {}): Promise<void> {
   assertServerOnly();

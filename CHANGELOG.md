@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+- Migration runner applies each file in its own transaction (SQL + history insert). A failed file rolls back only itself; earlier files remain committed; later files are not started. Re-runs resume at the first unapplied file. Checksums of applied files are still verified.
+- PostgreSQL holds one session-level advisory lock (`pg_advisory_lock`) for the whole run and always releases it, serializing concurrent runners connected to the same PostgreSQL server/database. The lock is not process-local. PGlite still uses only the process-local queue.
+- No application contract changes.
+
 ## 0.3.0
 - Added server-only database abstraction: PGlite when `DATABASE_URL` is unset, PostgreSQL (`pg`) when it is set.
 - Added migration runner with separate histories for platform (`private.platform_migrations`), application, and API.

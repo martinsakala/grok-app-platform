@@ -76,4 +76,14 @@ getDatabase()
   → application queries
 ```
 
-Call `runMigrations` once at boot (or at the start of the first server request). Concurrent callers in one process are queued. Production also uses `pg_advisory_xact_lock`; that does **not** coordinate independent serverless isolates.
+Call `runMigrations` once at boot (or at the start of the first server request). Concurrent callers in one process are queued.
+
+Each migration **file** is its own transaction (file SQL + history insert). A failure rolls back only that file; earlier files stay committed; later files are not started. The next run resumes at the first unapplied file. Checksums of already-applied files are still verified.
+
+**PostgreSQL** holds one **session-level** advisory lock (`pg_advisory_lock`) for the whole run and releases it in `finally`. That lock serializes migration runners across processes, hosts, and serverless isolates **connected to the same PostgreSQL server/database**. It is not process-local. A transaction-scoped lock cannot be used: it would be released between per-file commits.
+
+**PGlite** uses only the process-local queue (no advisory lock).
+
+## Public API contract
+
+`runMigrations` options, `AppConfig`, health/version payloads, schema ownership, and how hosts pass SQL in are unchanged in 0.3.1.

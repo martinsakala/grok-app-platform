@@ -10,9 +10,32 @@
 
 Do **not** share one integer sequence across the three kinds. Each kind is ordered by **filename** (`0001_…sql`, `0002_…sql`, …).
 
+## Transaction semantics
+
+The runner does **not** wrap the whole platform → application → API run in one transaction.
+
+* Each migration **file** is applied in its own database transaction.
+* That transaction contains both the file’s SQL and the insert of its history row.
+* If a file fails, **only that file** is rolled back. Partial work from that file does not remain.
+* Later files in the same run are **not** started.
+* Files that already committed stay committed (including earlier kinds in the same run).
+* A later `runMigrations` call resumes at the first unapplied file. Already-applied files are skipped after checksum verification.
+
+Do not put `BEGIN`/`COMMIT` in a migration file.
+
 ## Checksums
 
-Each applied file is stored with a SHA-256 checksum of its SQL text. Re-running is a no-op when the checksum matches. If a previously applied file’s content changes, the runner **fails**. Add a new file; never edit a released migration.
+Each applied file is stored with a SHA-256 checksum of its SQL text. Re-running is a no-op when the checksum matches. If a previously applied file’s content changes, the runner **fails** before applying later files. Add a new file; never edit a released migration. Unapplied files may still be corrected — they are not in history yet.
+
+## Locking
+
+Concurrent callers **in one process** share a process-local queue (PGlite and PostgreSQL).
+
+**PostgreSQL** additionally takes one **session-level** advisory lock (`pg_advisory_lock`) for the entire run and always releases it (`pg_advisory_unlock`) before returning the connection. The lock is held across per-file commits; a transaction-scoped lock (`pg_advisory_xact_lock`) would be released between files and would not serialize the batch.
+
+That advisory lock coordinates **all sessions connected to the same PostgreSQL server/database** — other processes, other hosts, and serverless isolates that share the database. It is **not** process-local. It does **not** coordinate a different database or a different PostgreSQL server.
+
+**PGlite** has no advisory lock. Preview/dev is a single in-process database; only the process-local queue serializes callers.
 
 ## Production bundling
 
@@ -47,7 +70,7 @@ Same pattern for `app/migrations-api/` (views only, after application tables exi
 
 ## SQL constraints
 
-Portable PostgreSQL. No Neon-specific features, no extensions, no superuser-only operations. Do not put `BEGIN`/`COMMIT` in a file; the runner wraps each batch in a transaction.
+Portable PostgreSQL. No Neon-specific features, no extensions, no superuser-only operations. Do not put `BEGIN`/`COMMIT` in a file; the runner wraps **each file** (SQL + history insert) in its own transaction.
 
 ## Platform files
 

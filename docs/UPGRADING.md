@@ -8,6 +8,12 @@
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+## 0.3.1
+
+`breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`.
+
+Stabilization of migration transaction and lock semantics. No application code changes. Hosts already calling `runMigrations` pick up per-file commits and session-level PostgreSQL advisory locking on upgrade.
+
 ## 0.3.0
 
 `requiresAppChanges=true`, `requiresDatabaseMigration=true`.
