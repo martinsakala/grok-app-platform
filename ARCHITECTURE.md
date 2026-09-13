@@ -43,7 +43,7 @@
 
 11. Generated `app/routeTree.gen.ts` is an application-owned generated artifact.
 
-12. Root host glue changes only when Grok/TanStack/deploy integration requires it.
+12. Root glue changes only when Grok/TanStack/deploy integration requires it.
 
 13. A platform upgrade must not routinely change `/app/**`.
 
@@ -53,9 +53,9 @@
 
 16. Database ownership boundary:
 
-    * `private` = platform/internal data
-    * `app` = application domain data
-    * `api` = explicitly published application data
+    * `private` = platform/internal/operational data (never public data API)
+    * `app` = canonical application domain model
+    * `api` = explicitly published application data contract
 
 17. The platform must not contain knowledge of concrete domain entities.
 
@@ -64,8 +64,14 @@
 19. Runtime extension point (`src/runtime`):
 
     * Applications supply an `AppConfig` (`name`, `version`, `dataApiVersion`) via `defineAppConfig`.
-    * Platform exposes reusable helpers only: `getVersionResponse(config)`, `getHealthResponse()`, `getPlatformVersion()`.
-    * Platform version is read from the platform `VERSION` file at runtime — never hard-coded and never taken from the application.
-    * HTTP routes are not part of the platform; host apps create thin route adapters that call these helpers.
-    * Platform must not embed concrete application names, versions, or domain knowledge.
+    * Platform exposes reusable helpers: `getVersionResponse(config)`, `getHealthResponse()`, `getPlatformVersion()`.
+    * Platform version is a **generated constant** from the root `VERSION` file (`src/runtime/generated/platform-version.ts`). Runtime never reads `VERSION` from the filesystem.
+    * HTTP routes are not part of the platform; host apps create thin route adapters.
+    * `getHealthResponse` is async and includes a safe `{ database: { status, engine } }` probe. Import it only from server adapters (it touches the database layer).
 
+20. Database extension point (`src/database`):
+
+    * `getDatabase()` / `runMigrations({ applicationMigrations, apiMigrations })` / `getDatabaseDiagnostics()`.
+    * Engine: PostgreSQL when `DATABASE_URL` is set, otherwise PGlite (preview, ephemeral).
+    * Application and API SQL is passed in as `{ filename, sql }` (Vite `?raw` or a generated manifest). No runtime filesystem lookup of SQL files.
+    * Downstream apps must not patch platform DB implementation; capability changes happen upstream.

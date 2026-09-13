@@ -4,18 +4,26 @@
   "type": "module",
   "description": "Canonical shared platform layer for Grok Build applications",
   "exports": {
-    "./runtime": "./src/runtime/index.ts"
+    "./runtime": "./src/runtime/index.ts",
+    "./database": "./src/database/index.ts"
   },
   "scripts": {
     "generate:version": "node scripts/generate-platform-version.mjs",
-    "pretest": "npm run generate:version",
-    "pretypecheck": "npm run generate:version",
-    "prebuild": "npm run generate:version",
+    "generate:migrations": "node scripts/generate-platform-migrations.mjs",
+    "generate": "npm run generate:version && npm run generate:migrations",
+    "pretest": "npm run generate",
+    "pretypecheck": "npm run generate",
+    "prebuild": "npm run generate",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "pg": "^8.16.3"
+  },
   "devDependencies": {
     "@types/node": "^22.13.10",
+    "@types/pg": "^8.11.10",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
   }

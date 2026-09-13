@@ -37,10 +37,22 @@ AGENTS.md
 
 Business/domain logic and platform runtime logic do not belong here. Alias `@/*` points to `/app/*`. Generated `app/routeTree.gen.ts` is an application-owned generated artifact.
 
-## 4. Platform distribution
+Host `package.json` already includes `pg` and `@electric-sql/pglite` in the Grok Build template. No extra root glue is required for the database drivers.
+
+## 4. Application-owned database files
+
+```
+app/migrations/*.sql
+app/migrations-api/*.sql
+app/db.server.ts          # runMigrations + getDatabase (server-only)
+app/routes/api/health.ts  # thin adapter
+app/routes/api/version.ts # thin adapter
+```
+
+## 5. Platform distribution
 
 `/platform` is distributed into app repositories via git subtree from this canonical upstream. Files under `/platform/**` are platform-owned and must not be hand-edited in a concrete application.
 
-## 5. Host glue is outside the subtree
+## 6. Host glue is outside the subtree
 
 Root host glue is **not** part of the platform subtree. Platform subtree pull upgrades `/platform/**` only. Any required host-glue change must have explicit upgrade instructions (for example in `docs/UPGRADING.md` or release notes), because it will not arrive automatically with a normal platform upgrade.

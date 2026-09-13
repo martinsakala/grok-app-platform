@@ -15,7 +15,15 @@ export type VersionResponse = {
   dataApiVersion: string;
 };
 
+export type DatabaseEngine = "pglite" | "postgresql";
+
+export type DatabaseHealth = {
+  status: "ok" | "error";
+  engine: DatabaseEngine;
+};
+
 export type HealthResponse = {
-  status: "ok";
+  status: "ok" | "degraded";
   platformVersion: string;
+  database: DatabaseHealth;
 };

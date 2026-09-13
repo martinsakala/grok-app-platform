@@ -27,3 +27,14 @@ root host glue = host-owned
 * Platform upgrades must not routinely change `/app/**`.
 * Application features must not routinely change `/platform/**`.
 * Root glue changes must be explicit and documented; they are not part of the git subtree.
+
+## Database rules
+
+* Applications must not create domain tables in `private`.
+* The platform must not create domain tables in `app`.
+* `api` contains only objects the application explicitly publishes (views/functions), never a dump of `app`.
+* Downstream apps must not patch platform DB implementation (`platform/src/database/**`).
+* DB capability changes are made upstream, then pulled via `git subtree pull`.
+* Historical migration files are immutable after release; a new change is a new migration file.
+* Import `platform/src/database` only from server-side host code.
+* Do not import the runtime barrel from client components if that would pull `getHealthResponse` / database into the browser bundle.

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   assertAppConfig,
   defineAppConfig,
@@ -10,9 +10,19 @@ import {
   getVersionResponse,
 } from "../src/runtime/index.js";
 import { PLATFORM_VERSION } from "../src/runtime/generated/platform-version.js";
+import { resetDatabaseForTests, runMigrations } from "../src/database/index.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const platformVersionOnDisk = readFileSync(join(repoRoot, "VERSION"), "utf8").trim();
+
+beforeEach(async () => {
+  delete process.env.DATABASE_URL;
+  await resetDatabaseForTests();
+});
+
+afterEach(async () => {
+  await resetDatabaseForTests();
+});
 
 describe("defineAppConfig / assertAppConfig", () => {
   it("accepts a valid AppConfig", () => {
@@ -76,10 +86,12 @@ describe("getVersionResponse", () => {
 });
 
 describe("getHealthResponse", () => {
-  it("returns ok status with platformVersion from VERSION", () => {
-    expect(getHealthResponse()).toEqual({
+  it("returns ok status with platformVersion from VERSION after migrations", async () => {
+    await runMigrations();
+    await expect(getHealthResponse()).resolves.toEqual({
       status: "ok",
       platformVersion: platformVersionOnDisk,
+      database: { status: "ok", engine: "pglite" },
     });
   });
 });
@@ -87,13 +99,11 @@ describe("getHealthResponse", () => {
 describe("getPlatformVersion", () => {
   it("matches the platform VERSION file (current release)", () => {
     expect(getPlatformVersion()).toBe(platformVersionOnDisk);
-    expect(getPlatformVersion()).toBe("0.2.1");
   });
 });
 
 describe("generated PLATFORM_VERSION", () => {
   it("matches the root VERSION file", () => {
     expect(PLATFORM_VERSION).toBe(platformVersionOnDisk);
-    expect(PLATFORM_VERSION).toBe("0.2.1");
   });
 });
