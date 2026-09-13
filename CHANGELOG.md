@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+- Added shared server-side auth API (`src/auth`): `AuthUser`, `getCurrentUser`, `requireUser`, `getCurrentSession`, `UnauthorizedError`.
+- Wraps Grok Build Better Auth / Google OAuth (`auth.grok.me`). No custom OAuth, no `better-auth` dependency in this repository.
+- Platform migration `0002_auth.sql` creates Better Auth identity tables in `public` (documented Grok/Better Auth schema exception). Other operational tables stay in `private`. Future data API must exclude these tables.
+- Invariant: client-provided `user_id` is never an authorization authority. `ownerIdFromSession` / `assignOwner` always use the verified session.
+- `getAuthDiagnostics()` reports `{ schemaReady }` only — no secrets, no current user. Unsigned-in is not a health failure.
+- App contract version 2. Hosts must add thin `/api/auth/$` + `/login` + a Grok session adapter.
+
 ## 0.3.1
 - Migration runner applies each file in its own transaction (SQL + history insert). A failed file rolls back only itself; earlier files remain committed; later files are not started. Re-runs resume at the first unapplied file. Checksums of applied files are still verified.
 - PostgreSQL holds one session-level advisory lock (`pg_advisory_lock`) for the whole run and always releases it, serializing concurrent runners connected to the same PostgreSQL server/database. The lock is not process-local. PGlite still uses only the process-local queue.

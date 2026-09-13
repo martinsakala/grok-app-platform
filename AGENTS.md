@@ -38,3 +38,15 @@ root host glue = host-owned
 * Historical migration files are immutable after release; a new change is a new migration file.
 * Import `platform/src/database` only from server-side host code.
 * Do not import the runtime barrel from client components if that would pull `getHealthResponse` / database into the browser bundle.
+
+## Auth rules
+
+* Client-provided `user_id` is never an authorization authority.
+* Trusted identity comes only from the verified server-side session (`requireUser` / `getCurrentUser`).
+* Do not implement custom OAuth or parse Google tokens in the application. Wrap Grok Better Auth.
+* Do not edit host `src/lib/auth/` except `email-password.ts`.
+* Do not create `src/routes/auth/popup.tsx`.
+* Better Auth identity tables live in `public` (Grok/Better Auth exception). A future generic data API must never expose `user` / `session` / `account` / `verification`. Other operational tables stay in `private`.
+* Never log or return access tokens, refresh tokens, session tokens, OAuth secrets, or password hashes.
+* `/api/health` and `/api/version` stay public; an unsigned-in visitor is not degraded.
+* Import `platform/src/auth` only from server-side host code. Login UI is application-owned.

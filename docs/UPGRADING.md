@@ -8,6 +8,23 @@
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+## 0.4.0
+
+`breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=true`, `appContractVersion=2`.
+
+Shared auth. Hosts that want Google sign-in should:
+
+1. `git subtree pull --prefix=platform platform-upstream main --squash` — do not hand-edit `/platform`.
+2. Delete `VITE_AUTH_ENABLED` from `.grok/app-env.json` and restart via `npm run dev` / `startup.sh`.
+3. `cp migrations/auth/0001_auth.sql migrations/0001_auth.sql` (Grok Better Auth schema; do not edit).
+4. Add `app/routes/api/auth/$.ts` forwarding GET/POST to Grok `auth.handler` (relative import of `src/lib/auth/server` — `@/*` points at `/app/*`).
+5. Add application-owned `/login` with Sign in with Google (`signIn("grok-google")`) and `<UserButton />`.
+6. Add `app/auth.server.ts` that binds Grok `auth.api.getSession` to platform `createAuthSessionSource` / `requireUser` / `getCurrentUser`. Pass `authMiddleware`'s `bearerToken` in preview.
+7. Scope every per-user read/write with `requireUser().id`. Never trust a client-supplied `user_id`. Keep `user_id` as `TEXT` with no FK to `public."user"`.
+8. Leave `/api/health` and `/api/version` public. Optional: attach `getAuthDiagnostics()` (`{ schemaReady }`) without treating unsigned-in as degraded.
+
+Do not rewrite `src/lib/auth/`, do not add `.env`, do not create `src/routes/auth/popup.tsx`. See `docs/AUTH.md`.
+
 ## 0.3.1
 
 `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`.

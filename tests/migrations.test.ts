@@ -30,7 +30,7 @@ describe("platform migrations", () => {
     const history = await db.query<{ filename: string }>(
       "select filename from private.platform_migrations order by filename",
     );
-    expect(history.rows.map((row) => row.filename)).toEqual(["0001_init.sql"]);
+    expect(history.rows.map((row) => row.filename)).toEqual(["0001_init.sql", "0002_auth.sql"]);
 
     const diagnostics = await getDatabaseDiagnostics();
     expect(diagnostics).toEqual({
@@ -47,7 +47,7 @@ describe("platform migrations", () => {
     const history = await db.query<{ filename: string }>(
       "select filename from private.platform_migrations",
     );
-    expect(history.rows).toHaveLength(1);
+    expect(history.rows).toHaveLength(2);
   });
 
   it("fails when an applied migration checksum changes", async () => {

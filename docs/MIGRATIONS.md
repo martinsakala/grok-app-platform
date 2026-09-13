@@ -10,6 +10,8 @@
 
 Do **not** share one integer sequence across the three kinds. Each kind is ordered by **filename** (`0001_…sql`, `0002_…sql`, …).
 
+Platform `0002_auth.sql` is a platform file (history in `private.platform_migrations`) that creates Better Auth tables in `public`. That is the Grok schema exception documented in `docs/AUTH.md`, not an application migration.
+
 ## Transaction semantics
 
 The runner does **not** wrap the whole platform → application → API run in one transaction.

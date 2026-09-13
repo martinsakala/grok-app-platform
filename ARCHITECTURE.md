@@ -31,6 +31,7 @@
    scripts/
    server/
    AGENTS.md
+   src/lib/auth/          # Grok Better Auth chrome — do not rewrite
    ```
 
 7. Business/domain logic must not live in root host glue.
@@ -56,6 +57,7 @@
     * `private` = platform/internal/operational data (never public data API)
     * `app` = canonical application domain model
     * `api` = explicitly published application data contract
+    * `public` Better Auth tables (`"user"`, `"session"`, `"account"`, `"verification"`) are a documented Grok exception — see `docs/AUTH.md`. They are operational identity data, not a public data API.
 
 17. The platform must not contain knowledge of concrete domain entities.
 
@@ -67,7 +69,7 @@
     * Platform exposes reusable helpers: `getVersionResponse(config)`, `getHealthResponse()`, `getPlatformVersion()`.
     * Platform version is a **generated constant** from the root `VERSION` file (`src/runtime/generated/platform-version.ts`). Runtime never reads `VERSION` from the filesystem.
     * HTTP routes are not part of the platform; host apps create thin route adapters.
-    * `getHealthResponse` is async and includes a safe `{ database: { status, engine } }` probe. Import it only from server adapters (it touches the database layer).
+    * `getHealthResponse` is async and includes a safe `{ database: { status, engine } }` probe. Import it only from server adapters (it touches the database layer). Unsigned-in is not a health failure.
 
 20. Database extension point (`src/database`):
 
@@ -75,3 +77,11 @@
     * Engine: PostgreSQL when `DATABASE_URL` is set, otherwise PGlite (preview, ephemeral).
     * Application and API SQL is passed in as `{ filename, sql }` (Vite `?raw` or a generated manifest). No runtime filesystem lookup of SQL files.
     * Downstream apps must not patch platform DB implementation; capability changes happen upstream.
+
+21. Auth extension point (`src/auth`):
+
+    * Stable identity: `AuthUser`, `getCurrentUser(source)`, `requireUser(source)`, `getCurrentSession(source)`.
+    * The host binds `source` to Grok Better Auth (`auth.api.getSession`). The platform does not implement OAuth, does not ship `/api/auth/*`, and does not depend on `better-auth`.
+    * `Client-provided user_id is never an authorization authority.`
+    * Catch-all `app/routes/api/auth/$.ts` is a one-line adapter over Grok `auth.handler`. Login UI is application-owned.
+    * Preview: Grok auth PGlite and platform PGlite are separate processes-local databases. Production `DATABASE_URL` is shared.

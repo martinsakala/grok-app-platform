@@ -51,6 +51,7 @@ Never log or return `DATABASE_URL`, hostname, username, database name, or driver
 | `private` | platform | Internal/operational data. Migration histories live here. **No application domain tables. Not part of any public data API.** |
 | `app` | application | Canonical domain model. Platform must not create domain tables here. |
 | `api` | application (explicit publish) | Views/functions the app chooses to expose. Not a dump of `app`. |
+| `public` | Grok Better Auth (exception) | `"user"`, `"session"`, `"account"`, `"verification"` — required by Better Auth 1.6.x as wired by Grok. Not a public data API. See `docs/AUTH.md`. |
 
 ## Public API
 
@@ -84,6 +85,12 @@ Each migration **file** is its own transaction (file SQL + history insert). A fa
 
 **PGlite** uses only the process-local queue (no advisory lock).
 
+## Auth tables and two databases in preview
+
+Platform migration `0002_auth.sql` creates the Better Auth tables in `public`. In **preview**, Grok Better Auth uses a separate PGlite instance (`src/lib/db.ts`) from platform `getDatabase()`. Auth rows Better Auth writes are not visible to platform queries, and vice versa. Application `user_id` columns must be `TEXT` with **no FK** to `public."user"`.
+
+In **production**, both use `DATABASE_URL`, so they share one Postgres. Preview auth/session persistence is disposable; production PostgreSQL is persistent.
+
 ## Public API contract
 
-`runMigrations` options, `AppConfig`, health/version payloads, schema ownership, and how hosts pass SQL in are unchanged in 0.3.1.
+`runMigrations` options, `AppConfig`, health/version payloads, and how hosts pass SQL in are unchanged in 0.4.0. Schema ownership gains the documented public Better Auth exception. Hosts that want sign-in must follow `docs/AUTH.md` and `docs/UPGRADING.md` (app contract 2).
