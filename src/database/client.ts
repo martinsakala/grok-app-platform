@@ -1,3 +1,4 @@
+import { getPgliteFactory, wrapPglite } from "./adapter.js";
 import { assertServerOnly } from "./server-guard.js";
 import { getDatabaseEngine, readDatabaseUrl } from "./env.js";
 import type { InternalDatabase } from "./internal.js";
@@ -14,6 +15,12 @@ async function openDatabase(): Promise<InternalDatabase> {
     const { createPostgresDatabase } = await import("./postgres.js");
     return createPostgresDatabase(url);
   }
+  const factory = getPgliteFactory();
+  if (factory) {
+    const pg = await factory();
+    if (pg.waitReady) await pg.waitReady;
+    return wrapPglite(pg, { adopt: true });
+  }
   const { createPgliteDatabase } = await import("./pglite.js");
   return createPgliteDatabase();
 }
@@ -25,6 +32,10 @@ export function getDatabaseEngineName(): DatabaseEngine {
 /**
  * Lazy process-wide singleton. PGlite is in-memory and ephemeral across
  * preview restarts; PostgreSQL is used when DATABASE_URL is set.
+ *
+ * Preview hosts should call `setPgliteFactory(() => getPglite())` first so
+ * this singleton is Grok's Better Auth / `getSql()` instance, not a second WASM
+ * Postgres.
  */
 export function getDatabase(): Promise<Database> {
   return getInternalDatabase();

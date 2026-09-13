@@ -1,6 +1,6 @@
 # Auth
 
-Shared server-side identity for Grok Build applications. Platform 0.4.0 does
+Shared server-side identity for Grok Build applications. Platform 0.4.x does
 **not** implement OAuth. It wraps the Grok Better Auth scaffold that already
 ships in every host.
 
@@ -10,7 +10,7 @@ Each app runs **its own** Better Auth instance at same-origin `/api/auth/*` and
 federates to the shared **Grok auth broker** (`https://auth.grok.me`, overridable
 with `GROK_AUTH_ISSUER`) via the `genericOAuth` plugin.
 
-- **Google** is the documented/supported application login capability in 0.4.0
+- **Google** is the documented/supported application login capability
   (provider id `grok-google`, broker `idp=google`).
 - The Grok scaffold also wires **X**. Do not remove it from `GROK_PROVIDERS`;
   do not add other providers.
@@ -47,8 +47,6 @@ button to a gate viewer; use `<SignInGate>`.
 ## Server-side identity
 
 ```ts
-import type { AuthUser } from "../platform/src/auth/index.js";
-
 export type AuthUser = {
   id: string;
   email: string;
@@ -95,46 +93,65 @@ public."verification"
 This is an explicit, documented exception:
 
 1. Auth stays on the native Grok integration (no SQL rewrite hack).
-2. `AUTH_RELATIONS_EXCLUDED_FROM_DATA_API` names these four tables so a future
-   generic data API must never publish them.
+2. A future generic data API is a **positive allowlist on schema `api` only**.
+   `public`, `private`, and `app` are never auto-published.
+   `AUTH_RELATIONS_EXCLUDED_FROM_DATA_API` is defense-in-depth, not the primary
+   boundary.
 3. Every other platform operational table stays in `private`.
 4. Application domain tables stay in `app`. Do **not** add an FK from `app.*`
-   to `public."user"` — see preview limitation below.
+   to `public."user"`.
 
-Platform migration: `migrations/private/0002_auth.sql` (`CREATE … IF NOT EXISTS`
-matching the Grok Better Auth schema). Historical files are not edited.
-
-Grok hosts must **also** copy the scaffold file so Better Auth's own database
-has the schema:
+### Canonical owner of the Better Auth schema
 
 ```
-cp migrations/auth/0001_auth.sql migrations/0001_auth.sql
+Grok/Better Auth native migrations = canonical auth schema
+platform auth wrapper             = identity contract, not a second generator
 ```
 
-Do not edit that file. On production `DATABASE_URL` both appliers hit the same
-Postgres; `IF NOT EXISTS` makes the overlap safe.
+- **Canonical file:** host `migrations/auth/0001_auth.sql` (Better Auth CLI
+  Postgres adapter). Copy to `migrations/0001_auth.sql` when turning sign-in
+  on. **Do not edit.**
+- **Platform `migrations/private/0002_auth.sql`:** historical 0.4.0
+  compatibility bootstrap (`IF NOT EXISTS` of the same tables). **Do not
+  edit.** Do not add later platform migrations that copy new Better Auth
+  internal columns.
+
+On a shared database both appliers are safe because of `IF NOT EXISTS`.
 
 ## Preview vs production
 
+Hosts **must** call `setPgliteFactory(() => getPglite())` from server-only boot
+before `getDatabase()` / `runMigrations()`.
+
 | | Preview (no `DATABASE_URL`) | Production |
 | --- | --- | --- |
-| Auth DB | Grok `src/lib/db.ts` **PGlite** | Injected `DATABASE_URL` Postgres |
-| Platform DB | platform `getDatabase()` **PGlite** | Same `DATABASE_URL` Postgres |
+| Auth DB | Grok `getPglite()` | Injected `DATABASE_URL` Postgres (Better Auth `pg` Pool) |
+| Platform DB | **same** Grok PGlite (injected) | Platform `pg` Pool on the **same** `DATABASE_URL` |
 | Persistence | Ephemeral — restart wipes users, sessions, and app rows | Durable |
 | Credentials | Baked preview client, zero env files | Deployer-injected `GROK_AUTH_*` / `BETTER_AUTH_*` |
 | Sign-in UX | Popup + bearer | Redirect + `__Host-` cookie |
 
-**Two-PGlite limitation (preview only):** Grok Better Auth and the platform
-database are two in-process PGlite instances. Auth tables created by platform
-`0002_auth.sql` are **not** the tables Better Auth writes. Application rows
-keyed by `user_id` still work because `user_id` is plain `TEXT` copied from
-`requireUser().id`, with no foreign key.
-
-Production uses one PostgreSQL database, so both appliers see the same public
-auth tables.
+Production uses one PostgreSQL database and three pools (Better Auth, Grok
+`getSql()`, platform `getDatabase()`). That is one database, not one client.
+Platform keeps its own Pool so `withSession` + `pg_advisory_lock` survive
+per-file COMMIT. Grok `getSql()` cannot do that (see `docs/DATABASE.md`).
 
 Preview auth/session persistence is disposable. Production PostgreSQL is
-persistent. Persistent PGlite is out of scope for 0.4.0.
+persistent. Persistent PGlite is out of scope.
+
+## Why not wrap Grok `getSql()` as the platform driver
+
+`getSql()` is a parameterized `query()` that returns `rows[]`. It does not
+expose:
+
+* multi-statement `exec` (platform migration files are whole SQL scripts);
+* `transaction()`;
+* a held backend session / `PoolClient`.
+
+Neon pooled endpoints also keep no session state. The 0.3.1 runner requires
+one session-level advisory lock across per-file transactions. Replacing the
+platform Pool with `getSql()` would drop that guarantee. Preview unifies via
+`getPglite()` (single connection, transactions, `exec`) instead.
 
 ## Thin host adapters
 
@@ -147,6 +164,7 @@ forward to Grok's handler — no business logic, no token parsing.
 app/routes/api/auth/$.ts     # GET/POST → auth.handler (Grok Better Auth)
 app/routes/login.tsx         # application-owned Google sign-in UI
 app/auth.server.ts           # binds Grok getSession to platform helpers
+app/db.server.ts             # setPgliteFactory(() => getPglite()) then runMigrations
 ```
 
 Because this host uses TanStack `srcDirectory: "app"` and `@/*` → `/app/*`,
@@ -165,6 +183,14 @@ export const Route = createFileRoute("/api/auth/$")({
     },
   },
 });
+```
+
+```ts
+// app/db.server.ts (preview sharing — call before getDatabase)
+import { getPglite } from "../src/lib/db";
+import { setPgliteFactory } from "../platform/src/database/index.js";
+
+setPgliteFactory(() => getPglite());
 ```
 
 ```ts
@@ -214,7 +240,8 @@ components.
 `/api/health` and `/api/version` stay public. An unsigned-in visitor is not
 degraded. Do not put auth configuration, credentials, or the current user in
 those payloads. `getAuthDiagnostics()` may add `{ schemaReady: boolean }` as a
-safe extra.
+safe extra. After `setPgliteFactory`, `schemaReady` is the real Better Auth
+schema on the shared preview (or production) database.
 
 ## Turning sign-in on in a new app
 
@@ -224,11 +251,12 @@ safe extra.
 3. Add `app/routes/api/auth/$.ts` (snippet above).
 4. Add application `/login` with **Sign in with Google**.
 5. Add `app/auth.server.ts` binding Grok session → platform `requireUser`.
-6. Wrap per-user server functions with Grok `authMiddleware` **and** take
+6. Call `setPgliteFactory(() => getPglite())` from `app/db.server.ts`.
+7. Wrap per-user server functions with Grok `authMiddleware` **and** take
    identity from platform `requireUser()`.
-7. Keep `user_id` columns `TEXT`. Never trust a client-supplied user id.
+8. Keep `user_id` columns `TEXT`. Never trust a client-supplied user id.
 
-## What 0.4.0 does not include
+## What 0.4.x does not include
 
 API keys, audit log, generic SQL/data API, metadata API, organizations/teams,
 RBAC beyond authenticated/unauthenticated, email/password, and business user

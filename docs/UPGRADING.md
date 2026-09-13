@@ -8,6 +8,27 @@
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+## 0.4.1
+
+`breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=false`, `appContractVersion=2`.
+
+Shared preview PGlite. Hosts should:
+
+1. `git subtree pull --prefix=platform platform-upstream main --squash`.
+2. In server-only boot (`app/db.server.ts`), **before** `getDatabase()` / `runMigrations()`:
+
+   ```ts
+   import { getPglite } from "../src/lib/db";
+   import { setPgliteFactory } from "../platform/src/database/index.js";
+   setPgliteFactory(() => getPglite());
+   ```
+
+3. Do not import host `src/lib/db.ts` from `/platform`. Do not rewrite Grok `src/lib/db.ts` or `src/lib/auth/`.
+4. Keep the Nitro PGlite wasm/data copy (Grok still needs it).
+5. Do not edit `platform/migrations/private/0002_auth.sql`.
+
+Without step 2, platform still opens a second PGlite and `getAuthDiagnostics().schemaReady` describes that private instance, not Better Auth.
+
 ## 0.4.0
 
 `breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=true`, `appContractVersion=2`.

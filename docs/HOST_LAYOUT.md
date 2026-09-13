@@ -33,20 +33,22 @@ public/
 scripts/
 server/
 AGENTS.md
+src/lib/db.ts
+src/lib/auth/
 ```
 
 Business/domain logic and platform runtime logic do not belong here. Alias `@/*` points to `/app/*`. Generated `app/routeTree.gen.ts` is an application-owned generated artifact.
 
 Host `package.json` already includes `pg` and `@electric-sql/pglite` in the Grok Build template. Better Auth is also pre-wired in host `src/lib/auth/` — do not rewrite it and do not add a second OAuth stack.
 
-Nitro's Vercel preset **does** need extra host glue for PGlite WASM assets. After `vite build`, copy `pglite.data`, `pglite.wasm`, and `initdb.wasm` from `node_modules/@electric-sql/pglite/dist/` next to the bundled `electric-sql__pglite*.mjs` (under `.vercel/output/functions/`). A `nitro({ hooks: { compiled } })` or Vite `closeBundle` plugin is the expected place. Dev mode does not need this — Vite SSR loads the files from `node_modules`.
+Nitro's Vercel preset **does** need extra host glue for PGlite WASM assets. After `vite build`, copy `pglite.data`, `pglite.wasm`, and `initdb.wasm` from `node_modules/@electric-sql/pglite/dist/` next to the bundled `electric-sql__pglite*.mjs` (under `.vercel/output/functions/`). A `nitro({ hooks: { compiled } })` or Vite `closeBundle` plugin is the expected place. Dev mode does not need this — Vite SSR loads the files from `node_modules`. Sharing one preview PGlite does not remove this copy.
 
 ## 4. Application-owned database and auth files
 
 ```
 app/migrations/*.sql
 app/migrations-api/*.sql
-app/db.server.ts              # runMigrations + getDatabase (server-only)
+app/db.server.ts              # setPgliteFactory + runMigrations + getDatabase
 app/auth.server.ts            # binds Grok session → platform requireUser/getCurrentUser
 app/routes/api/health.ts      # thin adapter
 app/routes/api/version.ts     # thin adapter
@@ -58,7 +60,8 @@ Grok also requires host chrome that is **not** under `/app`:
 
 ```
 src/lib/auth/**               # Better Auth instance — do not edit (except email-password.ts)
-migrations/auth/0001_auth.sql # scaffold schema; copy to migrations/0001_auth.sql when turning sign-in on
+src/lib/db.ts                 # getSql() / getPglite() — do not rewrite
+migrations/auth/0001_auth.sql # canonical Better Auth schema; copy to migrations/0001_auth.sql when turning sign-in on
 ```
 
 Because `@/*` points at `/app/*`, the catch-all must import Grok auth with a relative path (`../../../../src/lib/auth/server`), not `@/lib/auth/server`. See `docs/AUTH.md`.

@@ -1,6 +1,8 @@
 /**
- * Better Auth identity relations that a future generic data API must never
- * publish. They sit in `public` only because Grok/Better Auth require it.
+ * Defense-in-depth denylist. The primary future data-API boundary is a
+ * **positive allowlist over schema `api` only**. `public`, `private`, and
+ * `app` must never be auto-published. These Better Auth relations sit in
+ * `public` only because Grok/Better Auth require it.
  */
 export const AUTH_RELATIONS_EXCLUDED_FROM_DATA_API = [
   'public."user"',

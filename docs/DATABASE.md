@@ -11,6 +11,53 @@ Server-side database capability for Grok Build hosts.
 
 Preview PGlite is **not** IndexedDB / browser persistence. The database runs on the server (Vite SSR / Node). Do not expect data to survive a sandbox restart.
 
+## Native Grok `getSql()` vs this layer
+
+Grok `src/lib/db.ts` (do not rewrite) exports:
+
+| | `getSql()` | `getPglite()` | this platform |
+| --- | --- | --- | --- |
+| Parameterized `query` | yes (`rows[]`) | yes | yes (`{ rows, rowCount }`) |
+| Multi-statement `exec` | **no** | yes | yes |
+| `transaction` | **no** | yes (`pg.transaction`) | yes |
+| Held backend session | **no** (pool borrow per query on Neon) | yes (single connection) | yes (`withSession`) |
+| Session-level `pg_advisory_lock` across COMMITs | **no** | n/a (skipped on PGlite) | PostgreSQL only |
+| Better Auth preview | via `getPglite()` | **the shared instance** | inject that instance |
+| Production `DATABASE_URL` | own `pg` Pool | throws | own `pg` Pool, same URL |
+
+Neon pooled endpoints keep **no session state** (Grok neon skill: do not rely on `SET`, `LISTEN/NOTIFY`, or session advisory locks). That is why production does **not** run platform migrations through `getSql()`.
+
+## Preview: one PGlite
+
+```
+Better Auth ─┐
+getSql()     ├── Grok getPglite()   ← setPgliteFactory(() => getPglite())
+getDatabase()┘
+```
+
+Call from server-only host boot **before** `getDatabase()` / `runMigrations()`:
+
+```ts
+import { getPglite } from "../src/lib/db";
+import { setPgliteFactory } from "../platform/src/database/index.js";
+
+setPgliteFactory(() => getPglite());
+```
+
+The factory is host → platform. `/platform` never imports `src/lib/db.ts`.
+`close()` on an adopted instance is a no-op so Better Auth keeps the WASM
+Postgres. Without the factory, platform creates a private PGlite (tests /
+legacy hosts) — `getAuthDiagnostics().schemaReady` would then describe that
+private instance, not Better Auth.
+
+## Production: one Postgres, platform-owned Pool
+
+```
+Better Auth  ── pg Pool ─┐
+getSql()     ── pg Pool ─┼── DATABASE_URL
+getDatabase()── pg Pool ─┘  (withSession + pg_advisory_lock)
+```
+
 ## Production bundling (PGlite assets)
 
 SQL migrations are embedded (generate-time for platform, Vite `?raw` for the app). PGlite itself still loads `pglite.wasm` + `pglite.data` from disk next to its JS module.
@@ -21,7 +68,9 @@ Vite **dev** SSR resolves those files from `node_modules`. Nitro **production** 
 ENOENT: open '.../functions/__server.func/_libs/pglite.data'
 ```
 
-The host must copy `pglite.data`, `pglite.wasm`, and `initdb.wasm` next to that chunk after `vite build`. This is host glue, not a `/platform` patch. Real production PostgreSQL (`DATABASE_URL` set) does not need the copy.
+The host must copy `pglite.data`, `pglite.wasm`, and `initdb.wasm` next to that chunk after `vite build`. This is host glue, not a `/platform` patch. Sharing one PGlite does **not** remove the copy: Grok `src/lib/db.ts` still loads those files. Real production PostgreSQL (`DATABASE_URL` set) does not need the copy at runtime, but preview-mode production builds (no `DATABASE_URL`) still do.
+
+The platform package keeps `@electric-sql/pglite` for tests and for hosts that do not inject a factory.
 
 ## Why `pg`
 
@@ -30,7 +79,8 @@ The production driver is **`pg` (node-postgres)**:
 * already present in Grok Build hosts;
 * parameterized queries (`$1`, `$2`, …);
 * TLS is controlled by the connection string (`sslmode=require`, etc.);
-* a small pool (`max: 4`) reuses warm serverless instances without opening dozens of connections.
+* a small pool (`max: 4`) reuses warm serverless instances without opening dozens of connections;
+* `withSession` holds one `PoolClient` so `pg_advisory_lock` outlives per-file COMMIT.
 
 Values are never interpolated into SQL strings.
 
@@ -50,8 +100,10 @@ Never log or return `DATABASE_URL`, hostname, username, database name, or driver
 | --- | --- | --- |
 | `private` | platform | Internal/operational data. Migration histories live here. **No application domain tables. Not part of any public data API.** |
 | `app` | application | Canonical domain model. Platform must not create domain tables here. |
-| `api` | application (explicit publish) | Views/functions the app chooses to expose. Not a dump of `app`. |
-| `public` | Grok Better Auth (exception) | `"user"`, `"session"`, `"account"`, `"verification"` — required by Better Auth 1.6.x as wired by Grok. Not a public data API. See `docs/AUTH.md`. |
+| `api` | application (explicit publish) | Views/functions the app chooses to expose. **The only future generic data-API allowlist.** |
+| `public` | Grok Better Auth (exception) | `"user"`, `"session"`, `"account"`, `"verification"` — required by Better Auth 1.6.x as wired by Grok. Canonical DDL is Grok `migrations/auth/0001_auth.sql`. Platform `0002_auth.sql` is a frozen `IF NOT EXISTS` bootstrap. Not a public data API. See `docs/AUTH.md`. |
+
+Do not auto-publish `public`, `private`, or `app`.
 
 ## Public API
 
@@ -62,16 +114,19 @@ import {
   runMigrations,
   getDatabaseDiagnostics,
   defineMigrations,
+  setPgliteFactory,
 } from "../platform/src/database/index.js";
 ```
 
 * `getDatabase()` — lazy singleton (`pglite` or `postgresql`).
+* `setPgliteFactory(() => getPglite())` — host injects Grok's preview instance.
 * `runMigrations({ applicationMigrations, apiMigrations })` — platform first, then app, then API.
 * `getDatabaseDiagnostics()` — `{ engine, connected, migrationsReady }` with no secrets.
 
 Lifecycle:
 
 ```
+setPgliteFactory(() => getPglite())   // preview hosts
 getDatabase()
   → runMigrations({ applicationMigrations, apiMigrations })
   → application queries
@@ -85,12 +140,6 @@ Each migration **file** is its own transaction (file SQL + history insert). A fa
 
 **PGlite** uses only the process-local queue (no advisory lock).
 
-## Auth tables and two databases in preview
-
-Platform migration `0002_auth.sql` creates the Better Auth tables in `public`. In **preview**, Grok Better Auth uses a separate PGlite instance (`src/lib/db.ts`) from platform `getDatabase()`. Auth rows Better Auth writes are not visible to platform queries, and vice versa. Application `user_id` columns must be `TEXT` with **no FK** to `public."user"`.
-
-In **production**, both use `DATABASE_URL`, so they share one Postgres. Preview auth/session persistence is disposable; production PostgreSQL is persistent.
-
 ## Public API contract
 
-`runMigrations` options, `AppConfig`, health/version payloads, and how hosts pass SQL in are unchanged in 0.4.0. Schema ownership gains the documented public Better Auth exception. Hosts that want sign-in must follow `docs/AUTH.md` and `docs/UPGRADING.md` (app contract 2).
+`getDatabase`, `runMigrations` options, `AppConfig`, and health/version payloads are unchanged in 0.4.1. Hosts that want a shared preview database add `setPgliteFactory` (app contract 2, `requiresAppChanges=true`, no new SQL file).

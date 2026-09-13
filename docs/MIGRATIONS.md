@@ -10,7 +10,7 @@
 
 Do **not** share one integer sequence across the three kinds. Each kind is ordered by **filename** (`0001_…sql`, `0002_…sql`, …).
 
-Platform `0002_auth.sql` is a platform file (history in `private.platform_migrations`) that creates Better Auth tables in `public`. That is the Grok schema exception documented in `docs/AUTH.md`, not an application migration.
+Platform `0002_auth.sql` is a **historical 0.4.0 compatibility bootstrap** (`IF NOT EXISTS` of Better Auth tables in `public`). It must not be edited. Canonical Better Auth DDL is Grok `migrations/auth/0001_auth.sql`. Do not add later platform migrations that copy new Better Auth internal columns.
 
 ## Transaction semantics
 
@@ -39,6 +39,8 @@ That advisory lock coordinates **all sessions connected to the same PostgreSQL s
 
 **PGlite** has no advisory lock. Preview/dev is a single in-process database; only the process-local queue serializes callers.
 
+Do not run this runner through Grok `getSql()`: that API has no held client, so the session-level lock cannot outlive per-file COMMIT.
+
 ## Production bundling
 
 Runtime **must not** read `.sql` files from the filesystem (`import.meta.url` lookups break after Vite/Nitro bundling).
@@ -60,20 +62,3 @@ Runtime **must not** read `.sql` files from the filesystem (`import.meta.url` lo
   `defineMigrations(...)` validates filenames and freezes a sorted list.
 
 Optional: generate a TypeScript manifest the same way the platform does. Do not pass filesystem paths into the runner.
-
-## Adding an application migration
-
-1. Create `app/migrations/000N_short_name.sql` (next numeric prefix).
-2. Import it with `?raw` (or regenerate a manifest).
-3. Pass it in `applicationMigrations`.
-4. Deploy / restart so `runMigrations` runs once.
-
-Same pattern for `app/migrations-api/` (views only, after application tables exist).
-
-## SQL constraints
-
-Portable PostgreSQL. No Neon-specific features, no extensions, no superuser-only operations. Do not put `BEGIN`/`COMMIT` in a file; the runner wraps **each file** (SQL + history insert) in its own transaction.
-
-## Platform files
-
-Canonical: `migrations/private/*.sql`. After editing, run `npm run generate:migrations` and commit the generated module.

@@ -32,6 +32,7 @@
    server/
    AGENTS.md
    src/lib/auth/          # Grok Better Auth chrome — do not rewrite
+   src/lib/db.ts          # Grok getSql() / getPglite() — do not rewrite
    ```
 
 7. Business/domain logic must not live in root host glue.
@@ -56,7 +57,7 @@
 
     * `private` = platform/internal/operational data (never public data API)
     * `app` = canonical application domain model
-    * `api` = explicitly published application data contract
+    * `api` = explicitly published application data contract (the only future generic data-API allowlist)
     * `public` Better Auth tables (`"user"`, `"session"`, `"account"`, `"verification"`) are a documented Grok exception — see `docs/AUTH.md`. They are operational identity data, not a public data API.
 
 17. The platform must not contain knowledge of concrete domain entities.
@@ -77,6 +78,8 @@
     * Engine: PostgreSQL when `DATABASE_URL` is set, otherwise PGlite (preview, ephemeral).
     * Application and API SQL is passed in as `{ filename, sql }` (Vite `?raw` or a generated manifest). No runtime filesystem lookup of SQL files.
     * Downstream apps must not patch platform DB implementation; capability changes happen upstream.
+    * `setPgliteFactory(() => getPglite())` is the host → platform adapter so preview uses Grok's PGlite (shared with Better Auth). Platform never imports host `src/lib/db.ts`.
+    * Production keeps the platform `pg` Pool: Grok `getSql()` cannot provide `withSession` or a session-level advisory lock. Better Auth, `getSql()`, and platform still share one `DATABASE_URL`.
 
 21. Auth extension point (`src/auth`):
 
@@ -84,4 +87,5 @@
     * The host binds `source` to Grok Better Auth (`auth.api.getSession`). The platform does not implement OAuth, does not ship `/api/auth/*`, and does not depend on `better-auth`.
     * `Client-provided user_id is never an authorization authority.`
     * Catch-all `app/routes/api/auth/$.ts` is a one-line adapter over Grok `auth.handler`. Login UI is application-owned.
-    * Preview: Grok auth PGlite and platform PGlite are separate processes-local databases. Production `DATABASE_URL` is shared.
+    * Preview (after host injects the factory): one Grok PGlite. Production: one `DATABASE_URL`.
+    * Canonical Better Auth schema is Grok `migrations/auth/0001_auth.sql`. Platform `0002_auth.sql` is a frozen compatibility bootstrap.

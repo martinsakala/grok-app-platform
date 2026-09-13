@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1
+- Preview database convergence: hosts inject Grok `getPglite()` via `setPgliteFactory`. Better Auth, Grok `getSql()`, and platform `getDatabase()` then share one PGlite. Public API `getDatabase` / `runMigrations` / `getDatabaseDiagnostics` is unchanged.
+- Native Grok `getSql()` is **not** the production adapter: it has no transactions, no multi-statement `exec`, and no held client, so it cannot keep a session-level `pg_advisory_lock` across per-file COMMIT. Production still uses the platform `pg` Pool (`withSession`) against the same `DATABASE_URL` Better Auth uses.
+- `0002_auth.sql` is unchanged (historical). Canonical Better Auth schema owner is Grok `migrations/auth/0001_auth.sql`. Platform `0002_auth.sql` is a compatibility bootstrap (`IF NOT EXISTS`).
+- `getAuthDiagnostics()` still probes `getDatabase()`. After the host injects Grok PGlite that is the real Better Auth schema, not a second WASM database.
+- Future generic data API is a positive allowlist on schema `api` only. `AUTH_RELATIONS_EXCLUDED_FROM_DATA_API` is defense-in-depth.
+- Hosts must call `setPgliteFactory(() => getPglite())` from server-only boot. `requiresAppChanges=true`, `requiresDatabaseMigration=false`.
+- Platform still ships `@electric-sql/pglite` for tests and for hosts that do not inject. The host Nitro PGlite wasm/data copy stays — Grok `src/lib/db.ts` still loads those files.
+
 ## 0.4.0
 - Added shared server-side auth API (`src/auth`): `AuthUser`, `getCurrentUser`, `requireUser`, `getCurrentSession`, `UnauthorizedError`.
 - Wraps Grok Build Better Auth / Google OAuth (`auth.grok.me`). No custom OAuth, no `better-auth` dependency in this repository.
