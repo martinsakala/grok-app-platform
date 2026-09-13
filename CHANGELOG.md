@@ -6,7 +6,7 @@
 - First platform migration creates schemas `private`, `app`, and `api`.
 - Health response is async and includes a safe `{ database: { status, engine } }` probe.
 - Platform SQL is embedded at generate-time (`src/database/generated/platform-migrations.ts`) so production bundles do not read `.sql` from disk.
-- Host apps pass application/API SQL into `runMigrations` (Vite `?raw` or an equivalent manifest).
+- Production Nitro/Vercel builds must copy PGlite `pglite.data` / `pglite.wasm` next to the bundled chunk (host glue; documented in HOST_LAYOUT and UPGRADING).
 
 ## 0.2.1
 - Platform version is a generated TypeScript constant (`src/runtime/generated/platform-version.ts`) produced from the root `VERSION` file.

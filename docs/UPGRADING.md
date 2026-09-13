@@ -18,4 +18,5 @@ Host apps that want the database capability should:
 2. Add `app/migrations/` and `app/migrations-api/` SQL files as needed.
 3. Call `runMigrations({ applicationMigrations, apiMigrations })` from **server-only** code, passing SQL via Vite `?raw` imports (not filesystem paths).
 4. Change `getHealthResponse()` callers to `await getHealthResponse()`; the payload now includes `database: { status, engine }`.
-5. Import `defineAppConfig` from `platform/src/runtime/app-config.ts` on the client. Do not import `platform/src/runtime/index.ts` or `platform/src/database` from client components.
+6. Import `defineAppConfig` from `platform/src/runtime/app-config.ts` on the client. Do not import `platform/src/runtime/index.ts` or `platform/src/database` from client components.
+7. After a production Nitro/Vercel build, PGlite JS is bundled but `pglite.data` / `pglite.wasm` / `initdb.wasm` are not. Copy those files from `node_modules/@electric-sql/pglite/dist/` next to the emitted `electric-sql__pglite*.mjs` chunk (typically `.vercel/output/functions/__server.func/_libs/`). Without this, production `/api/health` fails with `ENOENT …/pglite.data`. Dev/preview Vite SSR does not need the copy. See `docs/HOST_LAYOUT.md`.

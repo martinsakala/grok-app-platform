@@ -37,7 +37,9 @@ AGENTS.md
 
 Business/domain logic and platform runtime logic do not belong here. Alias `@/*` points to `/app/*`. Generated `app/routeTree.gen.ts` is an application-owned generated artifact.
 
-Host `package.json` already includes `pg` and `@electric-sql/pglite` in the Grok Build template. No extra root glue is required for the database drivers.
+Host `package.json` already includes `pg` and `@electric-sql/pglite` in the Grok Build template.
+
+Nitro's Vercel preset **does** need extra host glue for PGlite WASM assets. After `vite build`, copy `pglite.data`, `pglite.wasm`, and `initdb.wasm` from `node_modules/@electric-sql/pglite/dist/` next to the bundled `electric-sql__pglite*.mjs` (under `.vercel/output/functions/`). A `nitro({ hooks: { compiled } })` or Vite `closeBundle` plugin is the expected place. Dev mode does not need this — Vite SSR loads the files from `node_modules`.
 
 ## 4. Application-owned database files
 

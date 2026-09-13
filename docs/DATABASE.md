@@ -11,6 +11,18 @@ Server-side database capability for Grok Build hosts.
 
 Preview PGlite is **not** IndexedDB / browser persistence. The database runs on the server (Vite SSR / Node). Do not expect data to survive a sandbox restart.
 
+## Production bundling (PGlite assets)
+
+SQL migrations are embedded (generate-time for platform, Vite `?raw` for the app). PGlite itself still loads `pglite.wasm` + `pglite.data` from disk next to its JS module.
+
+Vite **dev** SSR resolves those files from `node_modules`. Nitro **production** bundles `electric-sql__pglite.mjs` but does not emit the sibling data files, which produces:
+
+```
+ENOENT: open '.../functions/__server.func/_libs/pglite.data'
+```
+
+The host must copy `pglite.data`, `pglite.wasm`, and `initdb.wasm` next to that chunk after `vite build`. This is host glue, not a `/platform` patch. Real production PostgreSQL (`DATABASE_URL` set) does not need the copy.
+
 ## Why `pg`
 
 The production driver is **`pg` (node-postgres)**:
