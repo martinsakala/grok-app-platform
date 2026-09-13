@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   assertAppConfig,
   defineAppConfig,
@@ -9,14 +9,10 @@ import {
   getPlatformVersion,
   getVersionResponse,
 } from "../src/runtime/index.js";
-import { clearPlatformVersionCache } from "../src/runtime/platform-version.js";
+import { PLATFORM_VERSION } from "../src/runtime/generated/platform-version.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const platformVersionOnDisk = readFileSync(join(repoRoot, "VERSION"), "utf8").trim();
-
-afterEach(() => {
-  clearPlatformVersionCache();
-});
 
 describe("defineAppConfig / assertAppConfig", () => {
   it("accepts a valid AppConfig", () => {
@@ -91,6 +87,13 @@ describe("getHealthResponse", () => {
 describe("getPlatformVersion", () => {
   it("matches the platform VERSION file (current release)", () => {
     expect(getPlatformVersion()).toBe(platformVersionOnDisk);
-    expect(getPlatformVersion()).toBe("0.2.0");
+    expect(getPlatformVersion()).toBe("0.2.1");
+  });
+});
+
+describe("generated PLATFORM_VERSION", () => {
+  it("matches the root VERSION file", () => {
+    expect(PLATFORM_VERSION).toBe(platformVersionOnDisk);
+    expect(PLATFORM_VERSION).toBe("0.2.1");
   });
 });

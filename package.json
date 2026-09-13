@@ -7,6 +7,10 @@
     "./runtime": "./src/runtime/index.ts"
   },
   "scripts": {
+    "generate:version": "node scripts/generate-platform-version.mjs",
+    "pretest": "npm run generate:version",
+    "pretypecheck": "npm run generate:version",
+    "prebuild": "npm run generate:version",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
