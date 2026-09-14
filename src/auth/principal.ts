@@ -66,10 +66,12 @@ function bearerToken(request: Request | undefined): string | null {
 /**
  * Resolve a principal from an API key (`gk_…`) or a verified session.
  * Client `user_id` is never consulted. Missing identity → 401.
+ * `appConfig.ownerEmails` is passed into role bootstrap.
  */
 export async function requirePrincipal(
   source: AuthSessionSource,
   request?: Request,
+  appConfig?: { ownerEmails?: readonly string[] },
 ): Promise<Principal> {
   const token = bearerToken(request);
   if (token && token.startsWith("gk_")) {
@@ -79,6 +81,6 @@ export async function requirePrincipal(
   }
   const user = await getCurrentUser(source);
   if (!user) throw new UnauthorizedError();
-  const roles = await ensureUserRoles(user);
+  const roles = await ensureUserRoles(user, appConfig?.ownerEmails ?? []);
   return { kind: "user", user, roles };
 }

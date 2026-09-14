@@ -8,6 +8,35 @@
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+## 0.7.1
+
+`breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=true`, `appContractVersion=3`.
+
+Closes the first-user owner race on a public app. **Always set `ownerEmails`.**
+Empty `ownerEmails` keeps the 0.7.0 first-authenticated-user bootstrap and is
+preview/dev behaviour only.
+
+1. `git subtree pull --prefix=platform platform-upstream main --squash`.
+2. No new host files. If the host is still on 0.6.0, `0003_access.sql` applies
+   on the next `runMigrations`.
+3. In `app/app-config.ts` set `ownerEmails` to the operators who should own
+   the app (trim/lowercase is done by `defineAppConfig`):
+
+   ```ts
+   export default defineAppConfig({
+     name: "my-app",
+     version: "0.1.0",
+     dataApiVersion: "0.5.1",
+     ownerEmails: ["you@example.com"],
+   });
+   ```
+
+4. After publish, listed users sign in and `GET /api/platform/me` shows
+   `roles` containing `owner`. Then switch the access policy to allowlist
+   (same curl as 0.7.0).
+
+See `docs/ACCESS.md`.
+
 ## 0.7.0
 
 `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=true`, `appContractVersion=3`.

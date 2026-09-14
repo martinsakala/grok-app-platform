@@ -69,6 +69,30 @@ describe("bootstrap and allowlist", () => {
     expect(stillOwner.roles).toEqual(["owner"]);
   });
 
+  it("ownerEmails blocks a stranger from winning first-user owner", async () => {
+    const cfg = { ownerEmails: ["alice@example.com"] };
+    const stranger = await requirePrincipal(source(bob), undefined, cfg);
+    expect(stranger.roles).toEqual(["member"]);
+    expect(stranger.roles).not.toContain("owner");
+    const listed = await requirePrincipal(source(alice), undefined, cfg);
+    expect(listed.roles).toContain("owner");
+  });
+
+  it("listed email becomes owner even as the second signed-in user", async () => {
+    const cfg = { ownerEmails: ["cara@allowed.test"] };
+    const first = await requirePrincipal(source(alice), undefined, cfg);
+    expect(first.roles).toEqual(["member"]);
+    const second = await requirePrincipal(source(cara), undefined, cfg);
+    expect(second.roles).toContain("owner");
+  });
+
+  it("empty ownerEmails keeps first-user bootstrap", async () => {
+    const first = await requirePrincipal(source(alice), undefined, { ownerEmails: [] });
+    expect(first.roles).toEqual(["owner"]);
+    const second = await requirePrincipal(source(bob), undefined, { ownerEmails: [] });
+    expect(second.roles).toEqual(["member"]);
+  });
+
   it("lets the owner through even when their email is not on the allowlist", async () => {
     const owner = await requirePrincipal(source(alice));
     await setAccessPolicy(owner, {

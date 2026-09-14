@@ -35,6 +35,7 @@ describe("defineAppConfig / assertAppConfig", () => {
       name: "example-app",
       version: "1.2.3",
       dataApiVersion: "1",
+      ownerEmails: [],
     });
     expect(Object.isFrozen(config)).toBe(true);
   });
@@ -48,6 +49,33 @@ describe("defineAppConfig / assertAppConfig", () => {
     expect(config.name).toBe("my-app");
     expect(config.version).toBe("0.1.0");
     expect(config.dataApiVersion).toBe("v1");
+    expect(config.ownerEmails).toEqual([]);
+  });
+
+  it("normalizes ownerEmails (trim, lowercase, unique) and rejects invalid", () => {
+    const config = defineAppConfig({
+      name: "a",
+      version: "1",
+      dataApiVersion: "1",
+      ownerEmails: ["  Alice@Example.COM ", "alice@example.com", "Bob@Other.com"],
+    });
+    expect(config.ownerEmails).toEqual(["alice@example.com", "bob@other.com"]);
+    expect(() =>
+      defineAppConfig({
+        name: "a",
+        version: "1",
+        dataApiVersion: "1",
+        ownerEmails: ["not-an-email"],
+      }),
+    ).toThrow(/ownerEmails/);
+    expect(() =>
+      defineAppConfig({
+        name: "a",
+        version: "1",
+        dataApiVersion: "1",
+        ownerEmails: "alice@example.com" as unknown as string[],
+      }),
+    ).toThrow(/ownerEmails/);
   });
 
   it("rejects missing or empty fields", () => {

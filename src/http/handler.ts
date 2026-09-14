@@ -100,7 +100,7 @@ function mapError(error: unknown): Response {
 }
 
 async function principalOf(ctx: RouteContext) {
-  return requirePrincipal(ctx.options.sessionSource(ctx.request), ctx.request);
+  return requirePrincipal(ctx.options.sessionSource(ctx.request), ctx.request, ctx.options.appConfig);
 }
 
 async function healthRoute(ctx: RouteContext): Promise<Response> {

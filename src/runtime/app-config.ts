@@ -4,6 +4,27 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+$/;
+
+function parseOwnerEmails(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    throw new TypeError("AppConfig.ownerEmails must be an array of emails");
+  }
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      throw new TypeError("AppConfig.ownerEmails must be an array of emails");
+    }
+    const email = entry.trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) {
+      throw new TypeError("AppConfig.ownerEmails contains an invalid email");
+    }
+    if (!out.includes(email)) out.push(email);
+  }
+  return out;
+}
+
 /**
  * Validates and freezes an application-supplied AppConfig.
  * This is the primary extension point: apps define config; platform does not own app identity.
@@ -23,6 +44,7 @@ export function defineAppConfig(config: AppConfig): AppConfig {
     name: config.name.trim(),
     version: config.version.trim(),
     dataApiVersion: config.dataApiVersion.trim(),
+    ownerEmails: Object.freeze(parseOwnerEmails(config.ownerEmails)),
   });
 }
 

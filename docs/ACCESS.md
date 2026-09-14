@@ -53,15 +53,20 @@ exact string match: an owner satisfies an admin check.
 
 ## Bootstrap
 
-The first `requirePrincipal` that succeeds as a **user** on an empty
-`private.user_roles` inserts `owner` for that user. Two concurrent first
-requests are serialized with `SELECT … FOR UPDATE` on `private.access_policy`
-(id = 1), so only one owner is created. Later users get `member` if the
-allowlist allows them.
+`AppConfig.ownerEmails` (optional, default `[]`) decides who may become owner.
 
-Default policy after `0003_access.sql`: `mode = 'open'`. That is deliberate so
-mother-app does not lock itself out. **The first step on a new application
-after the first sign-in is to switch the policy to `allowlist`.**
+| `ownerEmails` | Who becomes owner |
+| --- | --- |
+| non-empty | every listed email (trim + lowercase), even if they sign in second, even if they already have `member` |
+| empty | first authenticated user on an empty `user_roles` (preview/dev only) |
+
+When the list is non-empty, a stranger who authenticates first gets `member`
+per policy — **never** `owner`. Concurrent grants are serialized with
+`SELECT … FOR UPDATE` on `private.access_policy` (id = 1).
+
+Default policy after `0003_access.sql`: `mode = 'open'`. **Always set
+`ownerEmails` on a public app**, then switch the policy to `allowlist`.
+Empty `ownerEmails` is a race: whoever hits `/api/platform/me` first wins.
 
 ## Allowlist
 

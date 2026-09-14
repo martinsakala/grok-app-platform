@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1
+- **ownerEmails** on `AppConfig` (optional, default `[]`, trim + lowercase). When non-empty, only listed emails receive `owner` — each of them, even if they are not first, even if they already have `member`. Anyone else as the first authenticated user gets `member` per policy, never `owner`. Empty list keeps the 0.7.0 first-user bootstrap (preview/dev only; set `ownerEmails` on a public app).
+- `createPlatformHandler` passes `appConfig` into `requirePrincipal` → `ensureUserRoles`. `/api/version` does not expose the email list.
+- `breaking=false`, `requiresAppChanges=false` (field is optional), `requiresDatabaseMigration=true` (`0003_access.sql` from 0.7.0). No new migration, no historical SQL edits.
+
 ## 0.7.0
 - **Principal** (`src/auth`): `requirePrincipal` is a signed-in user or an API key (`gk_…`). `Role` is `owner` ⊇ `admin` ⊇ `member`. `requireRole` / `hasRole`. `requireUser` stays. `assignOwner` / `ownerIdFromSession` / data-API list accept `Principal` or `AuthUser`. Client `user_id` is still never identity.
 - **Access** (`src/access`, migration `0003_access.sql`): first authenticated user becomes `owner` (serialized on `private.access_policy`). Later users become `member` if the allowlist allows them. Default mode is `open`; switch new apps to `allowlist`. Owner always passes. `listUsers` / `setRoles` (admin+; last owner cannot be dropped; admin cannot change an owner). `getAccessPolicy` / `setAccessPolicy` (owner).

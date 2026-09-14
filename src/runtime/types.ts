@@ -6,6 +6,11 @@ export type AppConfig = {
   name: string;
   version: string;
   dataApiVersion: string;
+  /**
+   * Emails that receive `owner` on first (or later) sign-in.
+   * Empty = first-authenticated-user bootstrap (preview/dev only).
+   */
+  ownerEmails?: readonly string[];
 };
 
 export type VersionResponse = {

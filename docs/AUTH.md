@@ -63,7 +63,7 @@ export type AuthUser = {
 | `ownerIdFromSession(user, client?)` | always `user.id`; ignores `client.user_id` |
 | `assignOwner(user, record)` | copies `record` but forces `user_id` from the session (`AuthUser` or `Principal`) |
 | `getAuthDiagnostics()` | `{ schemaReady }` — no secrets, no current user |
-| `requirePrincipal(source, request?)` | `Principal` (user + roles, or API key); 401 without identity |
+| `requirePrincipal(source, request?, appConfig?)` | `Principal` (user + roles, or API key); 401 without identity. `appConfig.ownerEmails` drives owner bootstrap. |
 
 `requireUser` is unchanged and still the session-only helper. Prefer
 `requirePrincipal` when a route should accept an API key as well. See
