@@ -74,6 +74,27 @@ When a host **does** still have subtree metadata, `git subtree pull` remains
 the documented path for that host.
 
 
+## 0.12.0
+
+`breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion=6` (unchanged).
+
+Keyset cursor pagination on the data API. No new SQL. Do not edit historical
+migrations. Hosts that already list via `GET /api/platform/data/:resource`
+get `?cursor=` and `nextCursor` without code changes. Old `offset` clients
+keep working.
+
+1. Upgrade `/platform` (subtree pull **or** snapshot overlay above) to 0.12.0.
+   Confirm `platform/VERSION` is `0.12.0` and `/platform` has 0 diffs against
+   the release SHA.
+2. Optional: walk lists with `listData(resource, { limit, cursor })` and
+   follow `nextCursor`. When `cursor` is set, `offset` is ignored.
+3. Keep `setPgliteFactory` and the Nitro **closeBundle** PGlite copy; do
+   **not** replace `nitro({ hooks.compiled })`.
+
+A bad cursor is `400 { code: "invalid_cursor" }`. Cursors do not survive a
+change of `DATABASE_URL` (or a PGlite process restart). See `docs/DATA_API.md`.
+
+
 ## 0.11.0
 
 `breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=false`, `appContractVersion=6`.

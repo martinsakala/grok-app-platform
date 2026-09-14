@@ -109,7 +109,7 @@
 
     * Positive allowlist of named resources over schema `api` only. Schema `api` is not an automatic publish surface.
     * Hosts call `defineDataApi` + `listResource`. Every resource requires `ownerColumn`; the server filters by `ownerIdOf(principal)` (session user or API-key owner).
-    * `uniqueBy` (implicit `id` when `id` is returned) makes `ORDER BY` unique within one owner. It need not be in `columns`. The application owns that uniqueness; OFFSET is not a snapshot.
+    * `uniqueBy` (implicit `id` when `id` is returned) makes `ORDER BY` unique within one owner. It need not be in `columns`. The application owns that uniqueness. OFFSET is not a snapshot. 0.12.0 adds a signed keyset `cursor` over `(orderBy, uniqueBy)`; `nextCursor` is additive.
     * HTTP for list is `GET /api/platform/data/:resource` via `createPlatformHandler`. Hosts keep a thin catch-all; they do not reimplement list routing.
     * `public`, `private`, and `app` are never published. Auth denylist is defense-in-depth.
 

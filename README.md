@@ -61,7 +61,7 @@ domain layer on top of an unchanged, upgradable platform.
 | `runtime` | `platform/src/runtime` | `defineAppConfig`, `/api/version` and `/api/health` payload builders, platform version constant |
 | `database` | `platform/src/database` | `getDatabase()` (PGlite in preview, `pg` Pool in production), `runMigrations()` with per-file transactions, SHA-256 checksums and a session-level advisory lock, pooler-aware connection resolution |
 | `auth` | `platform/src/auth` | `requireUser` / `getCurrentUser` / `getCurrentSession` over the Grok Better Auth session, `assignOwner`, `ownerIdFromSession`. No OAuth implemented here. |
-| `data-api` | `platform/src/data-api` | `defineDataApi` + `listResource`: read-only, allowlisted, owner-scoped list over views in schema `api` |
+| `data-api` | `platform/src/data-api` | `defineDataApi` + `listResource`: read-only, allowlisted, owner-scoped list over views in schema `api`; offset and signed keyset `cursor` |
 | `logging` | `platform/src/logging` | `createLogger` / `logError`: one JSON line, secret keys and connection strings redacted |
 | `http` | `platform/src/http` | `createPlatformHandler`: `/api/platform/health`, `/version`, `/data/:resource`, plus `/me`, `/admin/*`, `/api-keys`, `/settings`, `/admin/audit`, `/design` (import / export / gallery) |
 | `access` | `platform/src/access` | roles, first-user-as-owner bootstrap, allowlist policy |
@@ -79,7 +79,9 @@ the platform owns admin pages; the host only mounts them (see `docs/UI.md`).
 (see `docs/DESIGN.md`). 0.11.0 adds **import, gallery, and export** so an owner
 can paste, upload, or pick a preset in `/admin/design` and apply it immediately;
 commit the downloaded `design.md` to the repo root (the coding agent reads the
-file, not the database). Hosts that landed `/platform` as a snapshot (no subtree
+file, not the database). 0.12.0 adds **keyset `cursor` pagination** on
+`GET /api/platform/data/:resource` (`nextCursor`; old `offset` still works).
+Hosts that landed `/platform` as a snapshot (no subtree
 metadata) copy the upstream tree instead of `git subtree pull` — `docs/UPGRADING.md`.
 
 ## How it works
@@ -131,10 +133,10 @@ anything added to mother-app later. The only update channel is this library:
 
 ## What it does not do (yet)
 
-Writes through a generic API, organizations and teams, audit log, cursor
-pagination, email/password sign-in. Applications own their writes through
-server functions guarded by `requireUser` / `requirePrincipal`. See
-`CHANGELOG.md` for what each version added.
+Writes through a generic API, organizations and teams, email/password
+sign-in. Applications own their writes through server functions guarded by
+`requireUser` / `requirePrincipal`. See `CHANGELOG.md` for what each version
+added.
 
 ## Development
 

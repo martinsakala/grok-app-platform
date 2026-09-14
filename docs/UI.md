@@ -27,7 +27,8 @@ export const platformClient = createPlatformClient({
 Typed methods cover every 0.8.0 route plus 0.10.0/0.11.0 design: `me`, `health`, `version`,
 `listUsers` / `setUserRoles`, `getAccessPolicy` / `setAccessPolicy`,
 `listApiKeys` / `createApiKey` / `revokeApiKey`, `listSettings` /
-`getSetting` / `setSetting` / `deleteSetting`, `listAudit`, `listData`,
+`getSetting` / `setSetting` / `deleteSetting`, `listAudit`,
+`listData(resource, { limit, offset, cursor })`,
 `getDesign` / `setDesign` / `resetDesign` / `importDesign` / `exportDesign` /
 `listDesignGallery`.
 

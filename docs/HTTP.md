@@ -9,7 +9,8 @@ Start does not forward unlisted methods, so `requiresAppChanges=false` in
 routes; it does not add HTTP routes. 0.10.0 adds public `GET /design` and
 owner `PUT`/`DELETE /design`. 0.11.0 adds owner `POST /design/import`,
 `GET /design/export`, `GET /design/gallery`, and optional handler
-`designMarkdown`.
+`designMarkdown`. 0.12.0 adds `?cursor=` on `GET /data/:resource` (signed
+keyset; `invalid_cursor` is 400).
 
 ## Prefix
 
@@ -21,7 +22,7 @@ the host rewrites those paths onto the same handler.
 | --- | --- | --- |
 | `GET` | `/api/platform/health` | public |
 | `GET` | `/api/platform/version` | public |
-| `GET` | `/api/platform/data/:resource` | principal (session or `gk_` key) |
+| `GET` | `/api/platform/data/:resource` | principal (session or `gk_` key). Query `limit`, `offset`, `cursor` |
 | `GET` | `/api/platform/me` | principal |
 | `GET` | `/api/platform/admin/users` | admin+ |
 | `PUT` | `/api/platform/admin/users/:id/roles` | admin+ |
@@ -62,6 +63,8 @@ export const handlePlatform = createPlatformHandler({
 `sessionSource` receives the original `Request` so the `Authorization` bearer
 (preview) and cookies (production) reach Better Auth. The client may send
 `user_id`, `schema`, `table`, or `sql` query params; they are ignored.
+`cursor` is a signed keyset token from a previous page (`docs/DATA_API.md`).
+A bad cursor is `DataApiError` `400 invalid_cursor`, never 500.
 
 `healthExtras` is optional. Merge result is shallow-spread onto the health
 payload. Use it for host-only fields such as `connection` and

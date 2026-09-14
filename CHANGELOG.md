@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0
+- **Data API keyset cursor.** `listResource` accepts `cursor` next to `limit`. When `cursor` is set, `offset` is ignored and the response `offset` is `0`. Response is `{ items, limit, nextCursor, offset }` — `nextCursor` is `null` when `items.length < limit`. Additive: old clients keep using `offset`.
+- Cursor is opaque `base64url(JSON { v:1, r, o, u }).HMAC-SHA256`. Key is derived from `DATABASE_URL` (or a random per-process key when unset). Valid only for the same resource on the same deployment. Malformed / unsigned / foreign-resource / other-deployment tokens are `400 invalid_cursor`, never `500`. The key and its derivation are never logged. Dates serialize as ISO, bigints as strings; comparison values are query parameters (identifiers only from the registry). `uniqueBy` is loaded internally and omitted from `items` unless listed in `columns`.
+- **HTTP:** `GET /api/platform/data/:resource?cursor=` (session or API key, same as before).
+- **Client:** `listData(resource, { limit, offset, cursor })`.
+- Host: `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion` remains **6**. No new SQL. No historical migration edits.
+
 ## 0.11.0
 - **Design import / gallery / export.** `platform.design` may store `{ markdown, spec, source, preset? }` (full `DesignSpec`, including Voice) or the 0.10 form subset. `validateDesignOverride` accepts both. Public `GET /design` adds `override.source` (`markdown` \| `preset` \| `form`) and never returns markdown, Voice, or Brand.
 - **HTTP (owner):** `POST /design/import` `{ markdown }` or `{ preset }`; parse errors are `400 { code: "invalid_design", errors: [{ line, message }] }`. `GET /design/export` `text/markdown` (stored markdown, else host `designMarkdown`). `GET /design/gallery` `{ presets: [{ id, name, tagline, colors }] }`. `DELETE /design` still resets. Audit `design.import`.
