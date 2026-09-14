@@ -51,10 +51,11 @@ app/migrations-api/*.sql
 app/db.server.ts              # setPgliteFactory + runMigrations + getDatabase
 app/auth.server.ts            # binds Grok session → platform requireUser/getCurrentUser
 app/data-api.ts               # optional 0.5.0 defineDataApi registry (application-owned)
-app/routes/api/health.ts      # thin adapter
-app/routes/api/version.ts     # thin adapter
+app/routes/api/platform/$.ts  # 0.6.0 catch-all → createPlatformHandler
+app/routes/api/health.ts      # alias → /api/platform/health
+app/routes/api/version.ts     # alias → /api/platform/version
 app/routes/api/auth/$.ts      # thin adapter → Grok auth.handler
-app/routes/api/data/$resource.ts  # optional 0.5.0 thin GET adapter
+app/routes/api/data/$resource.ts  # alias → /api/platform/data/:resource
 app/routes/login.tsx          # application-owned Google sign-in UI
 ```
 

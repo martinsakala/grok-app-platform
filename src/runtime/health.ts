@@ -6,6 +6,9 @@ import {
   getDatabaseEngine,
   type Database,
 } from "../database/index.js";
+import { createLogger, logError } from "../logging/index.js";
+
+const logger = createLogger("health");
 
 /**
  * Health payload with a safe database probe. Never includes connection
@@ -29,8 +32,8 @@ export async function getHealthResponse(database?: Database): Promise<HealthResp
       platformVersion,
       database: { status: "error", engine },
     };
-  } catch {
-    console.error("[platform] database health check failed");
+  } catch (error) {
+    logError(logger, error, "database health check failed");
     return {
       status: "degraded",
       platformVersion,

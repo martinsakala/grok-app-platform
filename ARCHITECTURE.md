@@ -69,7 +69,7 @@
     * Applications supply an `AppConfig` (`name`, `version`, `dataApiVersion`) via `defineAppConfig`.
     * Platform exposes reusable helpers: `getVersionResponse(config)`, `getHealthResponse()`, `getPlatformVersion()`.
     * Platform version is a **generated constant** from the root `VERSION` file (`src/runtime/generated/platform-version.ts`). Runtime never reads `VERSION` from the filesystem.
-    * HTTP routes are not part of the platform; host apps create thin route adapters.
+    * HTTP payload helpers live here; the 0.6.0 router in `src/http` is the `/api/platform` surface. Hosts mount a catch-all plus compatibility aliases.
     * `getHealthResponse` is async and includes a safe `{ database: { status, engine } }` probe. Import it only from server adapters (it touches the database layer). Unsigned-in is not a health failure.
 
 20. Database extension point (`src/database`):
@@ -91,10 +91,22 @@
     * Preview (after host injects the factory): one Grok PGlite. Production: one `DATABASE_URL`.
     * Canonical Better Auth schema is Grok `migrations/auth/0001_auth.sql`. Platform `0002_auth.sql` is a frozen compatibility bootstrap.
 
-22. Data API extension point (`src/data-api`):
+22. Logging extension point (`src/logging`):
+
+    * `createLogger(name)` / `setLogSink` / `logError`. One JSON line per event.
+    * Secret-like keys and connection strings / Bearer tokens are redacted.
+    * No stacks in production logs. Never log `DATABASE_URL` or the current user token.
+
+23. HTTP extension point (`src/http`):
+
+    * `createPlatformHandler({ appConfig, sessionSource, dataApi, getDatabase, healthExtras })`.
+    * Internal registry of method + path. New capabilities add routes here, not in the host.
+    * Prefix `/api/platform`. Host aliases keep `/api/health`, `/api/version`, `/api/data/:resource`.
+
+24. Data API extension point (`src/data-api`):
 
     * Positive allowlist of named resources over schema `api` only. Schema `api` is not an automatic publish surface.
     * Hosts call `defineDataApi` + `listResource`. Every resource requires `ownerColumn`; the server filters by the verified session user.
     * `uniqueBy` (implicit `id` when `id` is returned) makes `ORDER BY` unique within one owner. It need not be in `columns`. The application owns that uniqueness; OFFSET is not a snapshot.
-    * HTTP routes are not part of the platform; host apps create thin GET adapters.
+    * HTTP for list is `GET /api/platform/data/:resource` via `createPlatformHandler`. Hosts keep a thin catch-all; they do not reimplement list routing.
     * `public`, `private`, and `app` are never published. Auth denylist is defense-in-depth.

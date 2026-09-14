@@ -1,7 +1,10 @@
 import { getDatabase } from "../database/client.js";
 import { assertServerOnly } from "../database/server-guard.js";
 import type { Database } from "../database/types.js";
+import { createLogger, logError } from "../logging/index.js";
 import type { AuthDiagnostics } from "./types.js";
+
+const logger = createLogger("auth");
 
 async function relationExists(db: Database, qualifiedName: string): Promise<boolean> {
   const result = await db.query<{ exists: boolean }>(
@@ -28,8 +31,8 @@ export async function getAuthDiagnostics(database?: Database): Promise<AuthDiagn
     return {
       schemaReady: user && session && account && verification,
     };
-  } catch {
-    console.error("[platform] auth diagnostics failed");
+  } catch (error) {
+    logError(logger, error, "auth diagnostics failed");
     return { schemaReady: false };
   }
 }

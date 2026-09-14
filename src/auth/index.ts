@@ -12,6 +12,7 @@ export {
   assertNoSecrets,
   authUserKeys,
   ownerIdFromSession,
+  SECRET_KEY_PATTERN,
   toAuthSession,
   toAuthUser,
 } from "./identity.js";

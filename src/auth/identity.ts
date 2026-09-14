@@ -2,8 +2,9 @@ import type { AuthSession, AuthUser } from "./types.js";
 
 const AUTH_USER_KEYS = ["id", "email", "name", "image"] as const;
 
-const SECRET_KEY_PATTERN =
+export const SECRET_KEY_PATTERN =
   /(token|secret|password|hash|credential|authorization|cookie|bearer)/i;
+
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (value === null || value === undefined) return null;

@@ -62,9 +62,12 @@ domain layer on top of an unchanged, upgradable platform.
 | `database` | `platform/src/database` | `getDatabase()` (PGlite in preview, `pg` Pool in production), `runMigrations()` with per-file transactions, SHA-256 checksums and a session-level advisory lock, pooler-aware connection resolution |
 | `auth` | `platform/src/auth` | `requireUser` / `getCurrentUser` / `getCurrentSession` over the Grok Better Auth session, `assignOwner`, `ownerIdFromSession`. No OAuth implemented here. |
 | `data-api` | `platform/src/data-api` | `defineDataApi` + `listResource`: read-only, allowlisted, owner-scoped list over views in schema `api` |
+| `logging` | `platform/src/logging` | `createLogger` / `logError`: one JSON line, secret keys and connection strings redacted |
+| `http` | `platform/src/http` | `createPlatformHandler`: `/api/platform/health`, `/version`, `/data/:resource` |
 
-Everything is server-only. HTTP routes, login UI and domain logic stay in the
-application.
+Everything is server-only. Login UI stays in the application. HTTP under
+`/api/platform` is served by `createPlatformHandler`; hosts mount one catch-all
+plus aliases for `/api/health`, `/api/version`, `/api/data/:resource`.
 
 ## How it works
 
@@ -111,7 +114,7 @@ anything added to mother-app later. The only update channel is this library:
 - Rules for coding agents working in a host repository: [`docs/host/AGENTS.project.md`](docs/host/AGENTS.project.md)
 - Upgrading an existing application: [`docs/UPGRADING.md`](docs/UPGRADING.md) and [`compatibility.json`](compatibility.json)
 - Architecture and invariants: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`AGENTS.md`](AGENTS.md)
-- Module contracts: [`docs/AUTH.md`](docs/AUTH.md), [`docs/DATABASE.md`](docs/DATABASE.md), [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md), [`docs/DATA_API.md`](docs/DATA_API.md), [`docs/HOST_LAYOUT.md`](docs/HOST_LAYOUT.md)
+- Module contracts: [`docs/AUTH.md`](docs/AUTH.md), [`docs/DATABASE.md`](docs/DATABASE.md), [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md), [`docs/DATA_API.md`](docs/DATA_API.md), [`docs/HTTP.md`](docs/HTTP.md), [`docs/LOGGING.md`](docs/LOGGING.md), [`docs/HOST_LAYOUT.md`](docs/HOST_LAYOUT.md)
 
 ## What it does not do (yet)
 

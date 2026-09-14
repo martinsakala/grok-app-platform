@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+- **Logger** (`src/logging`): `createLogger(name)` writes one JSON line `{ts, level, name, msg, ...fields}`. `setLogSink` is the pluggable output (default `console`). Keys matching `SECRET_KEY_PATTERN` become `"[redacted]"`; string values are scrubbed of `postgres://` / `postgresql://` URLs and Bearer tokens. `logError` records `{name, code, message}` only — no stack, no DB URL/host/user. Platform `console.error("[platform] … failed")` sites now call `logError` with the caught error.
+- **HTTP router** (`src/http`): `createPlatformHandler` serves `GET /api/platform/health`, `/version`, `/data/:resource` from an internal method+path registry. Future capabilities add routes inside the platform; hosts keep one catch-all. Errors: `UnauthorizedError` → 401 `{error:"Unauthorized"}`; `DataApiError` → its status/code; anything else → 500 `{error:"Internal Server Error"}` plus `logError`. Unknown routes → 404 `{error, code:"not_found"}`. Responses are `cache-control: no-store`. Client `user_id` / schema / table / sql query params are ignored. Optional `healthExtras` lets the host attach a connection snapshot without forking health.
+- Hosts add `app/routes/api/platform/$.ts` and keep `/api/health`, `/api/version`, `/api/data/:resource` as one-line aliases that rewrite the path onto the same handler.
+- `breaking=false`, `requiresAppChanges=true` (catch-all file), `requiresDatabaseMigration=false`, `appContractVersion=3`. Data-API and auth contracts are unchanged. No historical migration edits.
+
 ## 0.5.1
 - Deterministic read-only list order: `uniqueBy` is a sort key independent of returned `columns`. `ORDER BY` uses `orderBy` then `uniqueBy` (once, when they differ). The unique column is not selected unless it is also in `columns`.
 - Compatibility: if `uniqueBy` is omitted and `id` is among `columns`, `id` remains the unique key (existing 0.5.0 host registrations keep working). Other incomplete configurations are rejected at `defineDataApi`. That is a fail-closed fix of previously unstable pagination, not a new product feature.

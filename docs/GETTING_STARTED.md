@@ -65,9 +65,10 @@ git subtree add --prefix=platform platform-upstream main --squash
 | `app/data-api.ts` | `defineDataApi({ resources: [...] })` |
 | `app/migrations/000N_*.sql` | domain tables in schema `app` |
 | `app/migrations-api/000N_*.sql` | `CREATE VIEW api.<name> AS SELECT <explicit columns> FROM app.<table>` |
-| `app/routes/api/health.ts`, `version.ts` | thin adapters over `getHealthResponse` / `getVersionResponse` |
+| `app/routes/api/platform/$.ts` | catch-all → `createPlatformHandler` |
+| `app/routes/api/health.ts`, `version.ts` | aliases rewriting onto `/api/platform/health` and `/version` |
 | `app/routes/api/auth/$.ts` | one-line forward to Grok `auth.handler` (relative import of `src/lib/auth/server`) |
-| `app/routes/api/data/$resource.ts` | thin GET adapter: `requireUser` then `listResource` |
+| `app/routes/api/data/$resource.ts` | alias rewriting onto `/api/platform/data/:resource` |
 | `app/routes/login.tsx` | application-owned sign-in UI using Grok `signIn("grok-google")` |
 
 The mother-app repository is the reference for every one of these files.
@@ -91,8 +92,12 @@ The mother-app repository is the reference for every one of these files.
 ```
 GET /api/health    → status ok, engine pglite, auth.schemaReady true
 GET /api/version   → platformVersion = platform/VERSION
+GET /api/platform/health → same payload as /api/health
+GET /api/platform/version → same payload as /api/version
 GET /api/auth/get-session (signed out) → null
 GET /api/data/<resource> (signed out)  → 401
+GET /api/platform/data/<resource> (signed out) → 401
+GET /api/platform/nope → 404 {code:"not_found"}
 ```
 
 Sign in with Google in the preview, create a row, confirm a second account does

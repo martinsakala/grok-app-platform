@@ -8,6 +8,35 @@
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+## 0.6.0
+
+`breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=false`, `appContractVersion=3`.
+
+Logger + platform HTTP router. **Subtree pull alone is not enough** — add the
+catch-all. Auth, data-API registry, query traffic, and migrations are unchanged.
+No historical SQL edits.
+
+1. `git subtree pull --prefix=platform platform-upstream main --squash`.
+2. Add `app/routes/api/platform/$.ts` that forwards `GET`/`POST`/`OPTIONS` (and
+   `HEAD` if the host lists it) to `createPlatformHandler`. Bind
+   `sessionSource: (request) => …` from `app/auth.server.ts` so the request's
+   `Authorization` header and cookies reach Better Auth. Pass `appConfig`,
+   `dataApi`, `getDatabase`, and optional `healthExtras`.
+3. Replace `app/routes/api/health.ts`, `version.ts`, and `data/$resource.ts`
+   with one-line aliases: rewrite the URL path to `/api/platform/health`,
+   `/api/platform/version`, `/api/platform/data/:resource` and call the same
+   handler. Keep those URLs — monitoring and the deployer still use them.
+4. Move host-only health fields (`connection` snapshot, `databaseShared`,
+   `auth.schemaReady`) into `healthExtras`. Do not fork `getHealthResponse`.
+5. Keep `setPgliteFactory(() => getPglite())` from 0.4.1. Keep the host Nitro
+   **closeBundle** PGlite wasm/data copy; do **not** replace
+   `nitro({ hooks.compiled })`.
+6. Do not edit `platform/migrations/private/0002_auth.sql`.
+
+After upgrade, unsigned preview: `/api/platform/health` ok/pglite,
+`/api/platform/version` `platformVersion` 0.6.0, `/api/platform/data/x` 401,
+`/api/health` and `/api/version` aliases still work, `/api/platform/nope` 404.
+
 ## 0.5.1
 
 `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion=2`.

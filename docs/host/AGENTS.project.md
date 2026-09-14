@@ -65,7 +65,9 @@ TanStack `srcDirectory: "app"`, alias `@/*` → `/app/*`. Import Grok chrome fro
 - Every per-user server function: `.middleware([authMiddleware])` **and**
   `requireUser(bearerToken)` from `app/auth.server.ts`. Scope every query by
   `user.id`; use `assignOwner` on inserts.
-- `/api/health` and `/api/version` stay public and secret-free.
+- `/api/health`, `/api/version`, `/api/platform/health` and `/api/platform/version` stay public and secret-free.
+- Mount platform HTTP at `app/routes/api/platform/$.ts`. Keep `/api/health`,
+  `/api/version`, `/api/data/$resource` as aliases onto that handler.
 - Login UI is application-owned (`app/routes/login.tsx`), using Grok
   `signIn("grok-google")` and `<UserButton />`.
 
