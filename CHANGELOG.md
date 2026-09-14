@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+- **Settings** (`src/settings`, migration `0004_settings_audit.sql`): `private.settings` JSON documents. Key `^[a-z][a-z0-9_.-]{0,99}$`. `platform.*` write = owner; other writes = admin+; read = member+. Value ≤ 64 KiB. `getSetting` / `setSetting` / `deleteSetting` / `listSettings`. HTTP `GET/PUT/DELETE /api/platform/settings/:key` and `GET /settings`.
+- **Audit log** (`src/audit`): `private.audit_log` append-only. `audit(principal, {action, entity, entityId?, meta?})` redacts meta (no secrets, keys, hashes); write failure is logged, not thrown. Auto-logged: owner bootstrap, auto-member, role change, access policy, API key create/revoke, settings set/delete. `GET /api/platform/admin/audit` (admin+, cursor by `id` desc, `limit` ≤ 100). No retention job.
+- Host catch-all unchanged (`requiresAppChanges=false`). `breaking=false`, `requiresDatabaseMigration=true`, `appContractVersion` remains 3. No historical migration edits.
+
+
 ## 0.7.1
 - **ownerEmails** on `AppConfig` (optional, default `[]`, trim + lowercase). When non-empty, only listed emails receive `owner` — each of them, even if they are not first, even if they already have `member`. Anyone else as the first authenticated user gets `member` per policy, never `owner`. Empty list keeps the 0.7.0 first-user bootstrap (preview/dev only; set `ownerEmails` on a public app).
 - `createPlatformHandler` passes `appConfig` into `requirePrincipal` → `ensureUserRoles`. `/api/version` does not expose the email list.

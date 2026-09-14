@@ -8,6 +8,37 @@
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+
+## 0.8.0
+
+`breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=true`, `appContractVersion=3`.
+
+Settings and an append-only audit log. Host catch-all from 0.6.0 is enough —
+new routes register inside the platform. **Subtree pull applies
+`0004_settings_audit.sql` on the next `runMigrations`.** Do not edit historical
+SQL. No retention: `private.audit_log` grows until you archive it.
+
+1. `git subtree pull --prefix=platform platform-upstream main --squash`.
+2. No new host files. Keep the 0.6.0 catch-all and aliases.
+3. After publish, the first request runs `0004`. Then, as owner:
+
+   ```bash
+   curl -sS -X PUT https://APP.grok.me/api/platform/settings/app.theme \
+     -H 'content-type: application/json' \
+     -H 'cookie: __Host-grok-auth.session_token=…' \
+     -d '{"value":{"color":"dark"}}'
+   ```
+
+   List recent audit rows (admin+):
+
+   ```bash
+   curl -sS 'https://APP.grok.me/api/platform/admin/audit?limit=50' \
+     -H 'cookie: __Host-grok-auth.session_token=…'
+   ```
+
+See `docs/SETTINGS.md` and `docs/AUDIT.md`. Keep `setPgliteFactory` and the
+Nitro **closeBundle** PGlite copy; do **not** replace `nitro({ hooks.compiled })`.
+
 ## 0.7.1
 
 `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=true`, `appContractVersion=3`.

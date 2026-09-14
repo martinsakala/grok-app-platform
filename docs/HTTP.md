@@ -3,7 +3,7 @@
 `createPlatformHandler` is the platform's HTTP surface. Hosts mount it once.
 New platform capabilities register routes here; they must not require a new
 host file per endpoint. 0.7.0 adds POST/PUT/DELETE and access routes; the
-host catch-all does not change.
+host catch-all does not change. 0.8.0 adds settings and the admin audit log.
 
 ## Prefix
 
@@ -22,6 +22,9 @@ the host rewrites those paths onto the same handler.
 | `GET` / `PUT` | `/api/platform/admin/access-policy` | owner |
 | `GET` / `POST` | `/api/platform/api-keys` | principal |
 | `DELETE` | `/api/platform/api-keys/:id` | owner of the key, or admin+ |
+| `GET` | `/api/platform/settings` | member+ |
+| `GET` / `PUT` / `DELETE` | `/api/platform/settings/:key` | read member+; write admin+, `platform.*` owner |
+| `GET` | `/api/platform/admin/audit` | admin+ |
 | `HEAD` / `OPTIONS` | same paths | public / same as matching GET |
 
 Unknown **path** → `404 { "error": "Not Found", "code": "not_found" }`.
@@ -66,8 +69,7 @@ not_found`.
 | anything else | 500 | `{ "error": "Internal Server Error" }` + `logError` |
 
 500 bodies never include SQL, driver text, or connection strings. Unknown
-resources are `DataApiError` `404 unknown_resource`. Access routes: see
-`docs/ACCESS.md`.
+resources are `DataApiError` `404 unknown_resource`. Access routes: see `docs/ACCESS.md`. Settings: `docs/SETTINGS.md`. Audit: `docs/AUDIT.md`.
 
 ## Host wiring
 

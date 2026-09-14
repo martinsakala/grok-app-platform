@@ -124,3 +124,15 @@
     * Lookup from `Authorization: Bearer gk_…` in `requirePrincipal`. Revoked keys are 401.
     * Never log the key or hash. Data API rows belong to `ownerUserId`.
 
+27. Settings extension point (`src/settings`):
+
+    * `private.settings` JSON documents. Key regex `^[a-z][a-z0-9_.-]{0,99}$`. Value ≤ 64 KiB.
+    * `platform.*` writes require `owner`. Other writes require `admin`. Reads require `member`.
+    * HTTP: `/api/platform/settings` and `/settings/:key`. `getSetting(key, fallback)` has no ACL (server defaults).
+
+28. Audit extension point (`src/audit`):
+
+    * `private.audit_log` is append-only. `audit()` redacts meta and never throws.
+    * Automatic rows for owner bootstrap, auto-member, role/policy/API-key/settings changes.
+    * `GET /api/platform/admin/audit` is admin+, cursor by `id` desc. No retention in 0.8.0.
+

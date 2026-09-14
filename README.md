@@ -63,9 +63,11 @@ domain layer on top of an unchanged, upgradable platform.
 | `auth` | `platform/src/auth` | `requireUser` / `getCurrentUser` / `getCurrentSession` over the Grok Better Auth session, `assignOwner`, `ownerIdFromSession`. No OAuth implemented here. |
 | `data-api` | `platform/src/data-api` | `defineDataApi` + `listResource`: read-only, allowlisted, owner-scoped list over views in schema `api` |
 | `logging` | `platform/src/logging` | `createLogger` / `logError`: one JSON line, secret keys and connection strings redacted |
-| `http` | `platform/src/http` | `createPlatformHandler`: `/api/platform/health`, `/version`, `/data/:resource`, plus 0.7.0 `/me`, `/admin/*`, `/api-keys` |
+| `http` | `platform/src/http` | `createPlatformHandler`: `/api/platform/health`, `/version`, `/data/:resource`, plus `/me`, `/admin/*`, `/api-keys`, `/settings`, `/admin/audit` |
 | `access` | `platform/src/access` | roles, first-user-as-owner bootstrap, allowlist policy |
 | `api-keys` | `platform/src/api-keys` | hashed `gk_` keys; plaintext once; data scoped to the key owner |
+| `settings` | `platform/src/settings` | JSON documents in `private.settings`; `platform.*` owner-only writes |
+| `audit` | `platform/src/audit` | append-only `private.audit_log`; admin cursor list; no retention job |
 
 Everything is server-only. Login UI stays in the application. HTTP under
 `/api/platform` is served by `createPlatformHandler`; hosts mount one catch-all

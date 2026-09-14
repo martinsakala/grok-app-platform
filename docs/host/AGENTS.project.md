@@ -71,6 +71,9 @@ TanStack `srcDirectory: "app"`, alias `@/*` → `/app/*`. Import Grok chrome fro
 - Login UI is application-owned (`app/routes/login.tsx`), using Grok
   `signIn("grok-google")` and `<UserButton />`. After the first sign-in,
   switch `PUT /api/platform/admin/access-policy` to `allowlist`.
+- App JSON config goes through `/api/platform/settings` (member reads, admin writes,
+  `platform.*` owner-only). Admin audit is `GET /api/platform/admin/audit`. Do not
+  store secrets in settings; there is no audit retention job.
 
 ## Before reporting done
 
