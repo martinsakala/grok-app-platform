@@ -110,3 +110,13 @@ export function getResource(registry: DataApiRegistry, name: unknown): DefinedDa
   }
   return resource;
 }
+
+export function listPublishedResources(
+  registry: DataApiRegistry,
+): { name: string; columns: readonly string[]; orderBy: string }[] {
+  return registry.resources.map((resource) => ({
+    name: resource.name,
+    columns: resource.columns,
+    orderBy: resource.orderBy,
+  }));
+}

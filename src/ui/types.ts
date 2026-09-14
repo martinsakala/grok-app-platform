@@ -76,6 +76,19 @@ export type ListDataQuery = {
   cursor?: string;
 };
 
+export type ListedDataResource = {
+  name: string;
+  columns: readonly string[];
+  orderBy: string;
+};
+
+export type DataResourcesList = { resources: ListedDataResource[] };
+
+export type ExportDataQuery = {
+  format: "csv" | "json";
+  limit?: number;
+};
+
 export type NavItem = {
   label: string;
   href: string;

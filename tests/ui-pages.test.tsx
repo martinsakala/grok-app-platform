@@ -9,6 +9,7 @@ import { AppShell } from "../src/ui/AppShell.js";
 import { AuditPage } from "../src/ui/AuditPage.js";
 import { DesignPage } from "../src/ui/DesignPage.js";
 import { MutationsPage } from "../src/ui/MutationsPage.js";
+import { DataResourcesPage } from "../src/ui/DataResourcesPage.js";
 import { ErrorBoundary } from "../src/ui/ErrorBoundary.js";
 import { PlatformClientError } from "../src/ui/errors.js";
 import { SettingsPage } from "../src/ui/SettingsPage.js";
@@ -46,6 +47,8 @@ function unusedClient(): PlatformClient {
     listDesignGallery: fail,
     listMutations: fail,
     runMutation: fail,
+    listDataResources: fail,
+    exportData: fail,
   };
 }
 
@@ -95,6 +98,8 @@ describe("platform UI pages", () => {
     expect(admin).toContain('href="/admin/design"');
     expect(admin).toContain("Mutations");
     expect(admin).toContain('href="/admin/mutations"');
+    expect(admin).toContain("Data");
+    expect(admin).toContain('href="/admin/data"');
     const withTokens = renderToString(
       <AppShell appName="mother-app" tokens={{ "--pf-bg": "#111111", "--pf-accent": "#abcdef" }}>
         <p>Hello</p>
@@ -372,6 +377,32 @@ describe("platform UI pages", () => {
     expect(data).toContain("create-note");
     expect(data).toContain("Run");
     expect(data).toContain('data-mutation-name="create-note"');
+  });
+
+  it("DataResourcesPage states", () => {
+    expect(renderToString(<DataResourcesPage client={client} preview={{ status: "loading" }} />)).toContain(
+      "Loading data",
+    );
+    expect(
+      renderToString(<DataResourcesPage client={client} preview={{ status: "forbidden" }} />),
+    ).toContain("Member role required");
+    const empty = renderToString(
+      <DataResourcesPage client={client} preview={{ status: "data", me: member, resources: [] }} />,
+    );
+    expect(empty).toContain("No resources");
+    const data = renderToString(
+      <DataResourcesPage
+        client={client}
+        preview={{
+          status: "data",
+          me: owner,
+          resources: [{ name: "owned-items", columns: ["id", "value"], orderBy: "id" }],
+        }}
+      />,
+    );
+    expect(data).toContain("owned-items");
+    expect(data).toContain("Export CSV");
+    expect(data).toContain("Export NDJSON");
   });
 
   it("member UsersPage 403 vs owner data; client error mapping 403", () => {

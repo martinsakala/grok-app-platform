@@ -14,6 +14,8 @@ import type {
   ListAuditQuery,
   ListDataQuery,
   ListResourceResult,
+  DataResourcesList,
+  ExportDataQuery,
   MeResponse,
   MutationRunResult,
   MutationsList,
@@ -48,6 +50,8 @@ export type PlatformClient = {
   deleteSetting: (key: string) => Promise<{ deleted: true }>;
   listAudit: (query?: ListAuditQuery) => Promise<AuditPage>;
   listData: (resource: string, query?: ListDataQuery) => Promise<ListResourceResult>;
+  listDataResources: () => Promise<DataResourcesList>;
+  exportData: (resource: string, query: ExportDataQuery) => Promise<Response>;
   getDesign: () => Promise<DesignResponse>;
   setDesign: (override: DesignOverride) => Promise<DesignResponse>;
   resetDesign: () => Promise<DesignResponse>;
@@ -166,6 +170,37 @@ export function createPlatformClient(options: PlatformClientOptions = {}): Platf
           cursor: query.cursor,
         })}`,
       ),
+    listDataResources: () => request<DataResourcesList>("/data"),
+    exportData: async (resource, query) => {
+      const headers = new Headers();
+      const bearer = await options.getBearer?.();
+      if (typeof bearer === "string" && bearer.trim()) {
+        headers.set("Authorization", `Bearer ${bearer.trim()}`);
+      }
+      const path = `/data/${encodeURIComponent(resource)}/export${queryString({
+        format: query.format,
+        limit: query.limit,
+      })}`;
+      let response: Response;
+      try {
+        response = await fetchFn(`${baseUrl}${path}`, { headers });
+      } catch {
+        throw new PlatformClientError(0, "network", "Request failed");
+      }
+      if (!response.ok) {
+        const text = await response.text();
+        let body: unknown = null;
+        if (text) {
+          try {
+            body = JSON.parse(text);
+          } catch {
+            body = null;
+          }
+        }
+        throw mapResponseError(response.status, body);
+      }
+      return response;
+    },
     getDesign: () => request<DesignResponse>("/design"),
     setDesign: (override) =>
       request<DesignResponse>("/design", {

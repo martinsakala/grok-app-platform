@@ -12,6 +12,7 @@ export { SettingsPage, type SettingsPreview } from "./SettingsPage.js";
 export { AuditPage, type AuditPreview } from "./AuditPage.js";
 export { DesignPage, type DesignPreview } from "./DesignPage.js";
 export { MutationsPage, type MutationsPreview } from "./MutationsPage.js";
+export { DataResourcesPage, type DataResourcesPreview } from "./DataResourcesPage.js";
 export type {
   MeResponse,
   NavItem,
@@ -28,4 +29,7 @@ export type {
   MutationsList,
   MutationRunResult,
   RunMutationOptions,
+  DataResourcesList,
+  ListedDataResource,
+  ExportDataQuery,
 } from "./types.js";

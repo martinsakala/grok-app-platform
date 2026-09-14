@@ -12,7 +12,7 @@ import {
   requireRole,
   type AuthSessionSource,
 } from "../auth/index.js";
-import { isDataApiError, listResource, type DataApiRegistry } from "../data-api/index.js";
+import { isDataApiError, listResource, exportResource, listPublishedResources, resolveExportMaxRows, DEFAULT_EXPORT_MAX_ROWS, type DataApiRegistry } from "../data-api/index.js";
 import type { Database } from "../database/types.js";
 import { createLogger, logError } from "../logging/index.js";
 import type { AppConfig } from "../runtime/types.js";
@@ -65,6 +65,8 @@ export type PlatformHandlerOptions = {
   designMarkdown?: string | (() => string | Promise<string | null | undefined>);
   /** Host mutation registry. Omit to hide GET/POST /mutations (404). */
   mutations?: MutationRegistry;
+  /** Hard cap for data exports. Setting `platform.export.max-rows` may only lower it. Default 100000. */
+  exportMaxRows?: number;
 };
 
 type RouteParams = Record<string, string>;
@@ -185,6 +187,55 @@ async function dataRoute(ctx: RouteContext): Promise<Response> {
     sql: ctx.url.searchParams.get("sql"),
   });
   return json(page);
+}
+
+async function listDataResourcesRoute(ctx: RouteContext): Promise<Response> {
+  if (!ctx.options.dataApi) return notFound();
+  await principalOf(ctx);
+  return json({ resources: listPublishedResources(ctx.options.dataApi) });
+}
+
+async function exportDataRoute(ctx: RouteContext): Promise<Response> {
+  if (!ctx.options.dataApi || !ctx.options.getDatabase) {
+    return notFound();
+  }
+  const principal = await principalOf(ctx);
+  const db = await ctx.options.getDatabase();
+  const setting = await getSetting<unknown>("platform.export.max-rows", null);
+  const maxRows = resolveExportMaxRows(ctx.options.exportMaxRows ?? DEFAULT_EXPORT_MAX_ROWS, setting);
+  const exported = await exportResource(
+    ctx.options.dataApi,
+    db,
+    {
+      resource: ctx.params.resource,
+      user: principal,
+      format: ctx.url.searchParams.get("format"),
+      limit: ctx.url.searchParams.get("limit"),
+    },
+    { maxRows },
+  );
+  await audit(principal, {
+    action: "data.export",
+    entity: "resource",
+    entityId: exported.resource,
+    meta: {
+      resource: exported.resource,
+      format: exported.format,
+      rows: exported.rows,
+      truncated: exported.truncated,
+      principal:
+        principal.kind === "user"
+          ? { kind: "user", id: principal.user.id }
+          : { kind: "api-key", id: principal.keyId },
+    },
+  });
+  const headers: Record<string, string> = {
+    ...NO_STORE,
+    "content-type": exported.contentType,
+    "content-disposition": `attachment; filename="${exported.filename}"`,
+  };
+  if (exported.truncated) headers["x-export-truncated"] = "true";
+  return new Response(exported.body, { status: 200, headers });
 }
 
 async function meRoute(ctx: RouteContext): Promise<Response> {
@@ -481,7 +532,9 @@ const routes: Route[] = [
   { method: "GET", pattern: "/design", handler: getDesignRoute },
   { method: "PUT", pattern: "/design", handler: putDesignRoute },
   { method: "DELETE", pattern: "/design", handler: deleteDesignRoute },
+  { method: "GET", pattern: "/data/:resource/export", handler: exportDataRoute },
   { method: "GET", pattern: "/data/:resource", handler: dataRoute },
+  { method: "GET", pattern: "/data", handler: listDataResourcesRoute },
   { method: "GET", pattern: "/me", handler: meRoute },
   { method: "GET", pattern: "/admin/users", handler: adminUsersRoute },
   { method: "PUT", pattern: "/admin/users/:id/roles", handler: adminSetRolesRoute },

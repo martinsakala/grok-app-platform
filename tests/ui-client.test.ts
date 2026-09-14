@@ -198,4 +198,33 @@ describe("createPlatformClient", () => {
     const ran = await client.runMutation("create-note", { text: "hi" }, { idempotencyKey: "abc" });
     expect(ran).toEqual({ ok: true, result: { id: "n1" } });
   });
+
+  it("listDataResources and exportData with bearer", async () => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const headers = new Headers(init?.headers);
+      if (url.endsWith("/data") && (!init?.method || init.method === "GET")) {
+        return jsonResponse(200, {
+          resources: [{ name: "owned-items", columns: ["id"], orderBy: "id" }],
+        });
+      }
+      if (url.includes("/data/owned-items/export?format=csv")) {
+        expect(headers.get("Authorization")).toBe("Bearer tok");
+        return new Response("id\n1\n", {
+          status: 200,
+          headers: { "content-type": "text/csv; charset=utf-8" },
+        });
+      }
+      return jsonResponse(500, { error: "Internal Server Error" });
+    });
+    const client = createPlatformClient({
+      fetch: fetchFn as unknown as typeof fetch,
+      getBearer: () => "tok",
+    });
+    const listed = await client.listDataResources();
+    expect(listed.resources[0]?.name).toBe("owned-items");
+    const exported = await client.exportData("owned-items", { format: "csv" });
+    expect(exported.ok).toBe(true);
+    expect(await exported.text()).toBe("id\n1\n");
+  });
 });
