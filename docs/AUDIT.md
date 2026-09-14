@@ -33,6 +33,7 @@ await audit(principal, {
 | `access_policy.set` | `setAccessPolicy` |
 | `api_key.create` / `api_key.revoke` | key issued or revoked (prefix + name, never plaintext) |
 | `settings.set` / `settings.delete` | setting written or deleted |
+| `design.set` | owner saved or reset `platform.design` |
 
 Existing owner `/me` calls are not logged.
 

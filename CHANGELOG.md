@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0
+- **Design contract** (`src/design`): `parseDesignMd` reads Markdown `design.md` (Brand, Colors, Typography, Shape, Voice) with line-numbered errors. `generateTokensCss` emits `--pf-*` matching `src/ui/tokens.css`, plus `[data-pf-theme=light|dark]` when both palettes exist. Voice never becomes CSS. CLI: `node --experimental-strip-types scripts/generate-design-tokens.mjs <design.md> <out.css>`.
+- **Runtime overrides**: settings key `platform.design` (owner JSON subset). Public `GET /api/platform/design` returns merged tokens (host `designTokens` + override). Owner `PUT` / `DELETE /design`; audit `design.set`. Corrupt override is ignored.
+- **UI**: `AppShell` / `AdminLayout` take `tokens` / `designUrl` and inject `<style>`. `DesignPage` (owner) is a color/font/radius form with live preview, Save, Reset.
+- Host: `requiresAppChanges=true` (root `design.md`, generate `app/design-tokens.css`, pass `designTokens`, mount `/admin/design`). `breaking=false`, `requiresDatabaseMigration=false`, `appContractVersion=5`.
+- **Docs:** `docs/DESIGN.md`, sample `docs/host/design.md`. UPGRADING documents snapshot overlay when `git subtree pull` fails with `Needed a single revision`.
+- No historical migration edits.
+
 ## 0.9.0
 - **UI zone** (`src/ui`): `AppShell`, `AdminLayout`, `StatusPage`, `UsersPage`, `AccessPolicyPage`, `ApiKeysPage`, `SettingsPage`, `AuditPage`. Tailwind classes + `--pf-*` tokens (`tokens.css`). Pages take a `client` prop; no router import; loading/empty/error/403 on every page. `StatusPage` compares against `PLATFORM_VERSION`, never a hardcoded string.
 - **Platform client**: `createPlatformClient({ baseUrl, getBearer? })` covers all existing `/api/platform` routes. Errors are `PlatformClientError { status, code, message }` with no secrets. API-key plaintext is success-only.

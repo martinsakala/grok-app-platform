@@ -75,8 +75,11 @@ TanStack `srcDirectory: "app"`, alias `@/*` → `/app/*`. Import Grok chrome fro
   `platform.*` owner-only). Admin audit is `GET /api/platform/admin/audit`. Do not
   store secrets in settings; there is no audit retention job.
 - Mount platform admin UI (`AppShell` / `StatusPage` / `/admin/*` pages) instead of
-  hand-rolled diagnostics. Import `tokens.css` and Tailwind `@source` `platform/src/ui`.
-  Catch-all must forward PUT and DELETE.
+  hand-rolled diagnostics. Import `tokens.css` / generated `app/design-tokens.css`
+  and Tailwind `@source` `platform/src/ui`. Catch-all must forward PUT and DELETE.
+- Před tvorbou UI čti `design.md` (repo root). Follow its Voice. Use `--pf-*`;
+  do not invent a second palette. Runtime overrides belong in `platform.design`
+  via `/admin/design`, not a parallel CSS file.
 
 ## Before reporting done
 

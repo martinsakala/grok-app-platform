@@ -99,10 +99,11 @@
 
 23. HTTP extension point (`src/http`):
 
-    * `createPlatformHandler({ appConfig, sessionSource, dataApi, getDatabase, healthExtras })`.
+    * `createPlatformHandler({ appConfig, sessionSource, dataApi, getDatabase, healthExtras, designTokens })`.
     * Internal registry of method + path (GET/POST/PUT/DELETE). New capabilities add routes here, not in the host.
     * Prefix `/api/platform`. Host aliases keep `/api/health`, `/api/version`, `/api/data/:resource`.
     * 0.7.0: `/me`, `/admin/users`, `/admin/access-policy`, `/api-keys`. Known path + wrong method is 405.
+    * 0.10.0: public `GET /design`; owner `PUT`/`DELETE /design`. `designTokens` is the host's build-time `--pf-*` map.
 
 24. Data API extension point (`src/data-api`):
 
@@ -133,7 +134,7 @@
 28. Audit extension point (`src/audit`):
 
     * `private.audit_log` is append-only. `audit()` redacts meta and never throws.
-    * Automatic rows for owner bootstrap, auto-member, role/policy/API-key/settings changes.
+    * Automatic rows for owner bootstrap, auto-member, role/policy/API-key/settings changes, and `design.set`.
     * `GET /api/platform/admin/audit` is admin+, cursor by `id` desc. No retention in 0.8.0.
 
 29. UI extension point (`src/ui`):
@@ -142,5 +143,15 @@
     * `createPlatformClient` is the only fetch wrapper pages use.
     * Hosts pass `href` / `onNavigate` / `userSlot`. The platform does not import a router.
     * Tokens live in `src/ui/tokens.css` (`--pf-*`). Tailwind v4 hosts must `@source` this directory.
-    * `appContractVersion` 4. Login UI remains application-owned.
+    * `AppShell` accepts `tokens` / `designUrl` and injects a `<style>` block so GUI overrides apply without rebuild.
+    * `appContractVersion` 5. Login UI remains application-owned.
+
+30. Design extension point (`src/design`):
+
+    * `design.md` (Markdown `key: value` under Brand / Colors / Typography / Shape / Voice) is the visual contract.
+    * `parseDesignMd` → `DesignSpec`. Errors include a line number (`design.md:N: …`).
+    * `generateTokensCss` writes `--pf-*` (same names as `tokens.css`). Voice is never CSS.
+    * Runtime: `platform.design` (owner JSON subset) merged in `GET /api/platform/design`.
+    * Hosts keep `design.md` at the app root, generate `app/design-tokens.css` at build, pass `designTokens` into the handler.
+    * Agents read `design.md` before writing UI.
 

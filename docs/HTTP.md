@@ -6,7 +6,8 @@ host file per endpoint. 0.7.0 adds POST/PUT/DELETE and access routes. 0.8.0 adds
 admin audit log. **The host catch-all must list PUT and DELETE** — TanStack
 Start does not forward unlisted methods, so `requiresAppChanges=false` in
 0.7.0/0.8.0 was incorrect on that point. 0.9.0 adds a UI client over these
-routes; it does not add HTTP routes.
+routes; it does not add HTTP routes. 0.10.0 adds public `GET /design` and
+owner `PUT`/`DELETE /design`.
 
 ## Prefix
 
@@ -28,6 +29,8 @@ the host rewrites those paths onto the same handler.
 | `GET` | `/api/platform/settings` | member+ |
 | `GET` / `PUT` / `DELETE` | `/api/platform/settings/:key` | read member+; write admin+, `platform.*` owner |
 | `GET` | `/api/platform/admin/audit` | admin+ |
+| `GET` | `/api/platform/design` | public |
+| `PUT` / `DELETE` | `/api/platform/design` | owner |
 | `HEAD` / `OPTIONS` | same paths | public / same as matching GET |
 
 Unknown **path** → `404 { "error": "Not Found", "code": "not_found" }`.
@@ -46,6 +49,7 @@ export const handlePlatform = createPlatformHandler({
   dataApi,
   getDatabase,
   healthExtras: async () => ({ /* host connection snapshot */ }),
+  designTokens, // optional build-time --pf-* map from design.md
 });
 ```
 
@@ -72,11 +76,11 @@ not_found`.
 | anything else | 500 | `{ "error": "Internal Server Error" }` + `logError` |
 
 500 bodies never include SQL, driver text, or connection strings. Unknown
-resources are `DataApiError` `404 unknown_resource`. Access routes: see `docs/ACCESS.md`. Settings: `docs/SETTINGS.md`. Audit: `docs/AUDIT.md`.
+resources are `DataApiError` `404 unknown_resource`. Access routes: see `docs/ACCESS.md`. Settings: `docs/SETTINGS.md`. Audit: `docs/AUDIT.md`. Design: `docs/DESIGN.md`.
 
 ## Host wiring
 
-One catch-all plus aliases — see `docs/UPGRADING.md` 0.6.0 / 0.7.0 / 0.9.0 and
+One catch-all plus aliases — see `docs/UPGRADING.md` 0.6.0 / 0.7.0 / 0.9.0 / 0.10.0 and
 `docs/HOST_LAYOUT.md`. The catch-all must forward GET, POST, PUT, DELETE,
 OPTIONS, and HEAD. Login UI and `/api/auth/$` stay application-owned. Admin
 pages: `docs/UI.md`.

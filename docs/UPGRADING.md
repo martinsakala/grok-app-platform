@@ -2,12 +2,136 @@
 
 * The platform lives in an app repository under `/platform`.
 * Files under `/platform/**` must not be edited by hand in a concrete application.
-* Upgrade is done via `git subtree pull`.
+* Upgrade is done via `git subtree pull` **when the host still has subtree
+  merge metadata**.
 * Before upgrading, check `compatibility.json`.
 * If `breaking=true` or `requiresAppChanges=true`, the agent must not perform a blind upgrade; evaluate migration instructions first.
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+## Snapshot overlay (`Needed a single revision`)
+
+mother-app (and any host that landed `/platform` as a **snapshot copy**
+rather than a `git subtree add`/`pull`) has no subtree merge history.
+`git subtree pull --prefix=platform platform-upstream main --squash`
+then fails with:
+
+```text
+fatal: Needed a single revision
+```
+
+Do **not** invent a subtree-merge to rewrite history. Copy the upstream
+**commit tree** onto `/platform` and prove it is identical:
+
+```bash
+# 1. Fetch the release (tag or SHA from grok-app-platform).
+git fetch platform-upstream
+SHA=$(git -C /path/to/grok-app-platform rev-parse HEAD)   # e.g. the 0.10.0 commit
+
+# 2. Replace /platform with that tree. Keep the host .git; drop upstream .git
+#    and junk (node_modules, coverage). Python shutil is enough; rsync is not
+#    required.
+python3 - <<'PY'
+import shutil, pathlib
+src = pathlib.Path("/path/to/grok-app-platform")
+dst = pathlib.Path("platform")
+ignore = shutil.ignore_patterns(".git", "node_modules", "coverage", "dist", ".turbo")
+if dst.exists():
+    shutil.rmtree(dst)
+shutil.copytree(src, dst, ignore=ignore)
+PY
+
+# 3. Verify 0 diffs against the same ignore set.
+python3 - <<'PY'
+import os, pathlib
+src = pathlib.Path("/path/to/grok-app-platform")
+dst = pathlib.Path("platform")
+skip = {".git", "node_modules", "coverage", "dist", ".turbo"}
+missing, extra, diff = [], [], []
+def walk(root):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in skip]
+        for name in filenames:
+            yield pathlib.Path(dirpath, name).relative_to(root)
+src_files = {p.as_posix() for p in walk(src)}
+dst_files = {p.as_posix() for p in walk(dst)}
+print("missing", sorted(src_files - dst_files))
+print("extra", sorted(dst_files - src_files))
+for rel in sorted(src_files & dst_files):
+    a, b = src / rel, dst / rel
+    if a.read_bytes() != b.read_bytes():
+        diff.append(rel)
+print("diff", diff)
+print("ok" if not (src_files - dst_files) and not (dst_files - src_files) and not diff else "FAIL")
+PY
+```
+
+Commit the overlay on the host as a snapshot (`Snapshot <app> on platform x.y.z.`).
+Do not force-push. Subsequent upgrades on a snapshot host repeat this copy;
+do not wait for `git subtree pull` to start working.
+
+When a host **does** still have subtree metadata, `git subtree pull` remains
+the documented path for that host.
+
+
+## 0.10.0
+
+`breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=false`, `appContractVersion=5`.
+
+`design.md` is the visual contract. Build-time CSS + runtime owner override
+(`platform.design`). No new SQL. Do not edit historical migrations.
+
+1. Upgrade `/platform` (subtree pull **or** snapshot overlay above) to 0.10.0.
+   Confirm `platform/VERSION` is `0.10.0` and `/platform` has 0 diffs against
+   the release SHA.
+2. Copy `platform/docs/host/design.md` to the **host root** as `design.md`.
+   Edit brand/voice there; keep hex + `key: value` format.
+3. Generate CSS in the host build (or a `predev`/`prebuild` script):
+
+   ```bash
+   node --experimental-strip-types platform/scripts/generate-design-tokens.mjs \
+     design.md app/design-tokens.css
+   ```
+
+4. `app/styles.css`: import the generated file (keep `@source` for platform UI):
+
+   ```css
+   @import "tailwindcss";
+   @import "./design-tokens.css";
+   @source "../platform/src/ui";
+   ```
+
+   `tokens.css` remains the fallback if generation has not run. Do not invent
+   a second token set.
+
+5. Pass build-time tokens into the handler and `designUrl` into the shell:
+
+   ```ts
+   import { parseDesignMd, tokensFromSpec } from "../platform/src/design/index.js";
+   import designMd from "../../design.md?raw";
+
+   createPlatformHandler({
+     appConfig,
+     sessionSource,
+     getDatabase,
+     designTokens: tokensFromSpec(parseDesignMd(designMd)),
+   });
+   ```
+
+   ```tsx
+   <AdminLayout appName={…} designUrl="/api/platform/design" userSlot={…}>
+   ```
+
+6. Add `app/routes/admin/design.tsx` mounting `DesignPage` with `client`.
+   Catch-all already forwards PUT/DELETE from 0.9.0.
+
+7. Keep `setPgliteFactory` and the Nitro **closeBundle** PGlite copy; do
+   **not** replace `nitro({ hooks.compiled })`.
+
+After upgrade, unsigned preview: `GET /api/platform/design` 200 with `--pf-*`
+tokens and `override: null`. `PUT /api/platform/design` 401. Signed-in owner:
+`/admin/design` Save writes `platform.design`; Reset restores build-time.
+See `docs/DESIGN.md`.
 
 ## 0.9.0
 

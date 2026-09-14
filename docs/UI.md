@@ -24,10 +24,11 @@ export const platformClient = createPlatformClient({
 });
 ```
 
-Typed methods cover every 0.8.0 route: `me`, `health`, `version`,
+Typed methods cover every 0.8.0 route plus 0.10.0 design: `me`, `health`, `version`,
 `listUsers` / `setUserRoles`, `getAccessPolicy` / `setAccessPolicy`,
 `listApiKeys` / `createApiKey` / `revokeApiKey`, `listSettings` /
-`getSetting` / `setSetting` / `deleteSetting`, `listAudit`, `listData`.
+`getSetting` / `setSetting` / `deleteSetting`, `listAudit`, `listData`,
+`getDesign` / `setDesign` / `resetDesign`.
 
 Failures become `PlatformClientError { status, code, message }`. Only the
 JSON fields `error` and `code` are copied. Tokens, hashes, and `gk_` keys
@@ -40,14 +41,15 @@ Pages take a `client` prop. They must not call `fetch` themselves.
 
 | Export | Role |
 | --- | --- |
-| `AppShell` | Header, nav (`{label, href}[]`), `userSlot`, main, empty state, `ErrorBoundary` |
-| `AdminLayout` | `AppShell` plus side nav (default `/admin/*` hrefs) |
+| `AppShell` | Header, nav (`{label, href}[]`), `userSlot`, main, empty state, `ErrorBoundary`. Optional `tokens` / `designUrl` injects `--pf-*` |
+| `AdminLayout` | `AppShell` plus side nav (default `/admin/*` hrefs, including Design) |
 | `StatusPage` | Health, version, `/me`. Compares version to `PLATFORM_VERSION`, never a hardcoded string |
 | `UsersPage` | Admin+: list + role editor. Owner-only edits of owners |
 | `AccessPolicyPage` | Owner: mode, domains, emails |
 | `ApiKeysPage` | Own keys; create shows plaintext once; revoke |
 | `SettingsPage` | Member read; admin write; `platform.*` owner |
 | `AuditPage` | Admin+: `before=id` pagination and action/entity filters |
+| `DesignPage` | Owner: colors / fonts / radius, live preview, Save → `platform.design`, Reset |
 
 Every page has loading / empty / error / 403 states. Optional `preview` is
 for tests (`renderToString`); hosts omit it.
@@ -55,9 +57,14 @@ for tests (`renderToString`); hosts omit it.
 ## Tokens
 
 `src/ui/tokens.css` defines `--pf-bg`, `--pf-fg`, `--pf-muted`, `--pf-accent`,
-`--pf-border`, `--pf-surface`, `--pf-danger`, `--pf-radius`, `--pf-font`.
-Components use those variables plus Tailwind utility classes. 0.10 will add
-`docs/design.md`; do not invent a second token set in the host.
+`--pf-accent-fg`, `--pf-border`, `--pf-surface`, `--pf-danger`, `--pf-ok`,
+`--pf-radius`, `--pf-radius-sm`, `--pf-radius-lg`, `--pf-font`,
+`--pf-heading-font`, `--pf-font-size`, `--pf-density`. Components use those
+variables plus Tailwind utility classes. 0.10.0: the host generates
+`app/design-tokens.css` from root `design.md` (see `docs/DESIGN.md`) and
+passes `designUrl="/api/platform/design"` so owner GUI changes apply without
+rebuild. Do not invent a second token set in the host. Voice stays in
+`design.md` and never reaches CSS.
 
 ## How the host mounts
 
@@ -67,7 +74,7 @@ Components use those variables plus Tailwind utility classes. 0.10 will add
 
    ```css
    @import "tailwindcss";
-   @import "../platform/src/ui/tokens.css";
+   @import "./design-tokens.css"; /* generated from design.md; fallback: platform tokens.css */
    @source "../platform/src/ui";
    ```
 
@@ -86,6 +93,7 @@ Components use those variables plus Tailwind utility classes. 0.10 will add
    app/routes/admin/access-policy.tsx   AccessPolicyPage
    app/routes/admin/api-keys.tsx        ApiKeysPage
    app/routes/admin/settings.tsx        SettingsPage
+   app/routes/admin/design.tsx          DesignPage
    app/routes/admin/audit.tsx           AuditPage
    ```
 
