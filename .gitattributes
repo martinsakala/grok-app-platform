@@ -1,0 +1,4 @@
+# Migration checksums are computed over raw SQL text; CRLF would break already-applied files.
+*.sql text eol=lf
+*.ts text eol=lf
+*.md text eol=lf
