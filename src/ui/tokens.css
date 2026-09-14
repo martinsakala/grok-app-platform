@@ -1,0 +1,19 @@
+/* Platform UI tokens (0.9.0). Hosts import this file. 0.10 will add design.md. */
+:root {
+  --pf-bg: #0f1115;
+  --pf-fg: #e8eaed;
+  --pf-muted: #9aa3b2;
+  --pf-accent: #6ea8fe;
+  --pf-border: #2a3140;
+  --pf-surface: #171b22;
+  --pf-danger: #f87171;
+  --pf-radius: 0.75rem;
+  --pf-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.pf-root {
+  background: var(--pf-bg);
+  color: var(--pf-fg);
+  font-family: var(--pf-font);
+  min-height: 100%;
+}
