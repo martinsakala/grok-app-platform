@@ -72,6 +72,7 @@ export type ListAuditQuery = {
 export type ListDataQuery = {
   limit?: number;
   offset?: number;
+  cursor?: string;
 };
 
 export type NavItem = {

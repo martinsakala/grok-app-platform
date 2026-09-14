@@ -12,9 +12,10 @@ export type DataApiOrderDirection = "asc" | "desc";
  * `ownerColumn` is required — 0.5.x has no anonymous or unscoped resources.
  *
  * `uniqueBy` is the column that makes `ORDER BY` unique **within one owner**.
- * It is used in `ORDER BY` even when it is not returned. The application is
- * responsible for that uniqueness on the published view; the name `id` does
- * not prove it. Offset pagination is not a consistent snapshot.
+ * It is used in `ORDER BY` and keyset cursors even when it is not returned.
+ * The application is responsible for that uniqueness on the published view;
+ * the name `id` does not prove it. Offset pagination is not a consistent
+ * snapshot; prefer `cursor` (0.12.0).
  */
 export type DataApiResource = {
   name: string;
@@ -50,6 +51,8 @@ export type ListResourceInput = {
   user: AuthUser | Principal | null | undefined;
   limit?: unknown;
   offset?: unknown;
+  /** Opaque keyset cursor from a previous page. When set, `offset` is ignored. */
+  cursor?: unknown;
   /** Ignored. Client identity is never an authorization authority. */
   user_id?: unknown;
   schema?: unknown;
@@ -62,4 +65,6 @@ export type ListResourceResult = {
   items: Record<string, unknown>[];
   limit: number;
   offset: number;
+  /** Signed keyset cursor for the next page, or null at the end. */
+  nextCursor: string | null;
 };

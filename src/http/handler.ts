@@ -154,6 +154,7 @@ async function dataRoute(ctx: RouteContext): Promise<Response> {
     user: principal,
     limit: ctx.url.searchParams.get("limit"),
     offset: ctx.url.searchParams.get("offset"),
+    cursor: ctx.url.searchParams.get("cursor"),
     user_id: ctx.url.searchParams.get("user_id"),
     schema: ctx.url.searchParams.get("schema"),
     table: ctx.url.searchParams.get("table"),

@@ -1,10 +1,16 @@
 import { UnauthorizedError } from "../auth/errors.js";
 import { asAuthUser } from "../auth/principal.js";
-import type { Database } from "../database/types.js";
+import type { Database, SqlParameter } from "../database/types.js";
+import { decodeCursor, encodeCursor } from "./cursor.js";
 import { DataApiError, isDataApiError } from "./errors.js";
 import { qualifyApiRelation, quoteIdent } from "./identifiers.js";
 import { getResource } from "./registry.js";
-import type { DataApiRegistry, ListResourceInput, ListResourceResult } from "./types.js";
+import type {
+  DataApiRegistry,
+  DefinedDataApiResource,
+  ListResourceInput,
+  ListResourceResult,
+} from "./types.js";
 import { DEFAULT_PAGE_SIZE, MAX_OFFSET, MAX_PAGE_SIZE } from "./types.js";
 
 function requireSessionUser(user: ListResourceInput["user"]) {
@@ -66,13 +72,28 @@ function orderBySql(orderBy: string, uniqueBy: string, directionSql: string): st
   return `${primary}, ${quoteIdent(uniqueBy)} ${directionSql}`;
 }
 
+function selectIdents(resource: DefinedDataApiResource): string[] {
+  const columns = [...resource.columns];
+  if (!columns.includes(resource.orderBy)) columns.push(resource.orderBy);
+  if (!columns.includes(resource.uniqueBy)) columns.push(resource.uniqueBy);
+  return columns;
+}
+
+function asSqlParam(value: string | number | boolean): SqlParameter {
+  return value;
+}
+
 /**
  * Read-only list. Always filters by the verified session user on `ownerColumn`.
  * Client `user_id` / schema / SQL fields on the input are ignored.
  *
  * ORDER BY uses `orderBy` then `uniqueBy` (unless they are the same column).
- * `uniqueBy` is not selected unless it is also in `columns`. Offset pages are
- * unique for a frozen result set; concurrent writes can still skip or repeat.
+ * `uniqueBy` is selected internally for keyset cursors even when it is not
+ * in `columns`; it is stripped from `items` unless the host listed it.
+ *
+ * `cursor` is a signed keyset token over `(orderBy, uniqueBy)`. When present,
+ * `offset` is ignored and the response `offset` is 0. Offset pagination
+ * remains for compatibility; it is not a consistent snapshot.
  */
 export async function listResource(
   registry: DataApiRegistry,
@@ -82,24 +103,54 @@ export async function listResource(
   const user = requireSessionUser(input.user);
   const resource = getResource(registry, input.resource);
   const limit = parsePositiveInt(input.limit, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, 1);
-  const offset = parsePositiveInt(input.offset, 0, MAX_OFFSET, 0);
+  const bound = decodeCursor(input.cursor, resource.name);
+  const offset = bound ? 0 : parsePositiveInt(input.offset, 0, MAX_OFFSET, 0);
 
-  const selectList = resource.columns.map((column) => quoteIdent(column)).join(", ");
+  const selectList = selectIdents(resource).map((column) => quoteIdent(column)).join(", ");
   const from = qualifyApiRelation(resource.relation);
   const owner = quoteIdent(resource.ownerColumn);
   const direction = resource.orderDirection === "desc" ? "DESC" : "ASC";
   const orderSql = orderBySql(resource.orderBy, resource.uniqueBy, direction);
+  const cmp = resource.orderDirection === "desc" ? "<" : ">";
 
-  const sql =
-    `select ${selectList} from ${from} where ${owner} = $1 ` +
-    `order by ${orderSql} limit $2 offset $3`;
+  const params: SqlParameter[] = [user.id];
+  let where = `${owner} = $1`;
+  if (bound) {
+    if (resource.uniqueBy === resource.orderBy) {
+      where += ` and ${quoteIdent(resource.orderBy)} ${cmp} $2`;
+      params.push(asSqlParam(bound.o));
+    } else {
+      where += ` and (${quoteIdent(resource.orderBy)}, ${quoteIdent(resource.uniqueBy)}) ${cmp} ($2, $3)`;
+      params.push(asSqlParam(bound.o), asSqlParam(bound.u));
+    }
+  }
+
+  const limitPlaceholder = `$${params.length + 1}`;
+  params.push(limit);
+  let sql =
+    `select ${selectList} from ${from} where ${where} ` +
+    `order by ${orderSql} limit ${limitPlaceholder}`;
+  if (!bound) {
+    const offsetPlaceholder = `$${params.length + 1}`;
+    params.push(offset);
+    sql += ` offset ${offsetPlaceholder}`;
+  }
 
   try {
-    const result = await db.query<Record<string, unknown>>(sql, [user.id, limit, offset]);
+    const result = await db.query<Record<string, unknown>>(sql, params);
+    const items = result.rows.map((row) => pickColumns(row, resource.columns));
+    let nextCursor: string | null = null;
+    if (items.length === limit) {
+      const last = result.rows[result.rows.length - 1];
+      if (last) {
+        nextCursor = encodeCursor(resource.name, last[resource.orderBy], last[resource.uniqueBy]);
+      }
+    }
     return {
-      items: result.rows.map((row) => pickColumns(row, resource.columns)),
+      items,
       limit,
       offset,
+      nextCursor,
     };
   } catch (error) {
     wrapQueryError(error);

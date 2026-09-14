@@ -181,6 +181,40 @@ describe("createPlatformHandler", () => {
     expect(text).not.toMatch(/SELECT |app\.owned_items|private/i);
   });
 
+  it("pages GET /data/:resource with ?cursor= and rejects a bad cursor", async () => {
+    await seed();
+    const first = await call(handlerFor(alice), "/api/platform/data/owned-items?limit=1");
+    expect(first.status).toBe(200);
+    const firstBody = first.body as { items: { id: string }[]; nextCursor: string | null; offset: number };
+    expect(firstBody.items.map((row) => row.id)).toEqual(["a2"]);
+    expect(firstBody.nextCursor).toEqual(expect.any(String));
+    expect(firstBody.offset).toBe(0);
+
+    const second = await call(
+      handlerFor(alice),
+      `/api/platform/data/owned-items?limit=1&cursor=${encodeURIComponent(firstBody.nextCursor as string)}&offset=99`,
+    );
+    expect(second.status).toBe(200);
+    const secondBody = second.body as { items: { id: string }[]; nextCursor: string | null; offset: number };
+    expect(secondBody.items.map((row) => row.id)).toEqual(["a1"]);
+    expect(secondBody.offset).toBe(0);
+    expect(secondBody.nextCursor).toEqual(expect.any(String));
+
+    const third = await call(
+      handlerFor(alice),
+      `/api/platform/data/owned-items?limit=1&cursor=${encodeURIComponent(secondBody.nextCursor as string)}`,
+    );
+    expect(third.status).toBe(200);
+    const thirdBody = third.body as { items: { id: string }[]; nextCursor: string | null };
+    expect(thirdBody.items).toEqual([]);
+    expect(thirdBody.nextCursor).toBeNull();
+
+    const bad = await call(handlerFor(alice), "/api/platform/data/owned-items?cursor=not-a-cursor");
+    expect(bad.status).toBe(400);
+    expect(bad.body).toEqual({ error: "Invalid cursor", code: "invalid_cursor" });
+    expect(bad.text).not.toMatch(/hmac|DATABASE_URL|postgres:\/\//i);
+  });
+
   it("maps unexpected errors to 500 without leaking SQL or connection strings", async () => {
     const handle = createPlatformHandler({
       appConfig,

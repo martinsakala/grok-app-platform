@@ -155,4 +155,17 @@ describe("createPlatformClient", () => {
     const md = await client.exportDesign();
     expect(md).toContain("# Brand");
   });
+
+  it("listData sends limit, offset and cursor", async () => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe(
+        "/api/platform/data/owned-items?limit=2&offset=0&cursor=abc.def",
+      );
+      return jsonResponse(200, { items: [{ id: "a1" }], limit: 2, offset: 0, nextCursor: null });
+    });
+    const client = createPlatformClient({ fetch: fetchFn as unknown as typeof fetch });
+    const page = await client.listData("owned-items", { limit: 2, offset: 0, cursor: "abc.def" });
+    expect(page.items).toEqual([{ id: "a1" }]);
+    expect(page.nextCursor).toBeNull();
+  });
 });

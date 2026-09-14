@@ -154,6 +154,7 @@ export function createPlatformClient(options: PlatformClientOptions = {}): Platf
         `/data/${encodeURIComponent(resource)}${queryString({
           limit: query.limit,
           offset: query.offset,
+          cursor: query.cursor,
         })}`,
       ),
     getDesign: () => request<DesignResponse>("/design"),
