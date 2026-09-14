@@ -11,7 +11,9 @@
     "./http": "./src/http/index.ts",
     "./logging": "./src/logging/index.ts",
     "./access": "./src/access/index.ts",
-    "./api-keys": "./src/api-keys/index.ts"
+    "./api-keys": "./src/api-keys/index.ts",
+    "./settings": "./src/settings/index.ts",
+    "./audit": "./src/audit/index.ts"
   },
   "scripts": {
     "generate:version": "node scripts/generate-platform-version.mjs",

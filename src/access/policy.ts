@@ -109,5 +109,13 @@ export async function setAccessPolicy(
   );
   const row = result.rows[0];
   if (!row) throw new ForbiddenError("forbidden");
-  return rowToPolicy(row);
+  const policy = rowToPolicy(row);
+  const { audit } = await import("../audit/index.js");
+  await audit(principal, {
+    action: "access_policy.set",
+    entity: "access_policy",
+    entityId: "1",
+    meta: { mode: policy.mode, allowedDomains: policy.allowedDomains, allowedEmails: policy.allowedEmails },
+  });
+  return policy;
 }

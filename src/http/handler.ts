@@ -1,6 +1,8 @@
 import { getAccessPolicy, listUsers, setAccessPolicy, setRoles } from "../access/index.js";
 import { createApiKey, listApiKeys, revokeApiKey } from "../api-keys/index.js";
+import { listAudit } from "../audit/index.js";
 import {
+  BadRequestError,
   isBadRequestError,
   isForbiddenError,
   isMethodNotAllowedError,
@@ -14,6 +16,12 @@ import type { Database } from "../database/types.js";
 import { createLogger, logError } from "../logging/index.js";
 import type { AppConfig } from "../runtime/types.js";
 import { getHealthResponse } from "../runtime/health.js";
+import {
+  deleteSetting,
+  getSettingRecord,
+  listSettings,
+  setSetting,
+} from "../settings/index.js";
 import { getVersionResponse } from "../runtime/version.js";
 import { readJsonBody } from "./json.js";
 
@@ -198,6 +206,48 @@ async function revokeKeyRoute(ctx: RouteContext): Promise<Response> {
   return json({ revoked: true });
 }
 
+async function listSettingsRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  const settings = await listSettings(principal);
+  return json({ settings });
+}
+
+async function getSettingRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  const record = await getSettingRecord(principal, ctx.params.key);
+  if (!record) return notFound();
+  return json(record);
+}
+
+async function putSettingRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  const body = (await readJsonBody(ctx.request)) as { value?: unknown };
+  if (!Object.prototype.hasOwnProperty.call(body, "value")) {
+    throw new BadRequestError("Missing value");
+  }
+  const record = await setSetting(principal, ctx.params.key, body.value);
+  return json(record);
+}
+
+async function deleteSettingRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  await deleteSetting(principal, ctx.params.key);
+  return json({ deleted: true });
+}
+
+async function listAuditRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  const page = await listAudit(principal, {
+    limit: ctx.url.searchParams.get("limit"),
+    before: ctx.url.searchParams.get("before"),
+    action: ctx.url.searchParams.get("action"),
+    entity: ctx.url.searchParams.get("entity"),
+    entity_id: ctx.url.searchParams.get("entity_id"),
+    principal_id: ctx.url.searchParams.get("principal_id"),
+  });
+  return json(page);
+}
+
 const routes: Route[] = [
   { method: "GET", pattern: "/health", handler: healthRoute },
   { method: "GET", pattern: "/version", handler: versionRoute },
@@ -210,6 +260,11 @@ const routes: Route[] = [
   { method: "GET", pattern: "/api-keys", handler: listKeysRoute },
   { method: "POST", pattern: "/api-keys", handler: createKeyRoute },
   { method: "DELETE", pattern: "/api-keys/:id", handler: revokeKeyRoute },
+  { method: "GET", pattern: "/settings", handler: listSettingsRoute },
+  { method: "GET", pattern: "/settings/:key", handler: getSettingRoute },
+  { method: "PUT", pattern: "/settings/:key", handler: putSettingRoute },
+  { method: "DELETE", pattern: "/settings/:key", handler: deleteSettingRoute },
+  { method: "GET", pattern: "/admin/audit", handler: listAuditRoute },
 ];
 
 function methodsForPath(rest: string): { methods: HttpMethod[]; params: RouteParams } | null {

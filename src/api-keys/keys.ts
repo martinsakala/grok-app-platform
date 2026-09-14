@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { audit } from "../audit/index.js";
 import { getInternalDatabase } from "../database/client.js";
 import { BadRequestError, ForbiddenError } from "../auth/errors.js";
 import { hasRole, ownerIdOf, type Principal } from "../auth/principal.js";
@@ -85,7 +86,14 @@ export async function createApiKey(
   );
   const row = result.rows[0];
   if (!row) throw new ForbiddenError("forbidden");
-  return { ...rowToView(row), key };
+  const view = rowToView(row);
+  await audit(principal, {
+    action: "api_key.create",
+    entity: "api_key",
+    entityId: view.id,
+    meta: { name: view.name, prefix: view.prefix },
+  });
+  return { ...view, key };
 }
 
 export async function listApiKeys(principal: Principal): Promise<ApiKeyView[]> {
@@ -131,4 +139,9 @@ export async function revokeApiKey(principal: Principal, keyId: string): Promise
     admin ? [keyId] : [keyId, ownerIdOf(principal)],
   );
   if (result.rows.length === 0) throw new ForbiddenError("forbidden");
+  await audit(principal, {
+    action: "api_key.revoke",
+    entity: "api_key",
+    entityId: keyId,
+  });
 }

@@ -121,4 +121,51 @@ describe("platform HTTP access", () => {
     expect((me.body as { kind: string }).kind).toBe("api-key");
     expect(JSON.stringify(me.body)).not.toMatch(/hash|token|password/i);
   });
+
+  it("enforces settings and audit HTTP authz (401/403)", async () => {
+    const anon = await call(handlerFor(null), "/api/platform/settings");
+    expect(anon.status).toBe(401);
+    const anonAudit = await call(handlerFor(null), "/api/platform/admin/audit");
+    expect(anonAudit.status).toBe(401);
+
+    await call(handlerFor(alice), "/api/platform/me");
+    await call(handlerFor(bob), "/api/platform/me");
+
+    const memberWrite = await call(handlerFor(bob), "/api/platform/settings/app.theme", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: { color: "dark" } }),
+    });
+    expect(memberWrite.status).toBe(403);
+
+    const memberAudit = await call(handlerFor(bob), "/api/platform/admin/audit");
+    expect(memberAudit.status).toBe(403);
+
+    const written = await call(handlerFor(alice), "/api/platform/settings/app.theme", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: { color: "dark" } }),
+    });
+    expect(written.status).toBe(200);
+    expect((written.body as { value: { color: string } }).value).toEqual({ color: "dark" });
+
+    const read = await call(handlerFor(bob), "/api/platform/settings/app.theme");
+    expect(read.status).toBe(200);
+
+    const missing = await call(handlerFor(alice), "/api/platform/settings/nope.missing");
+    expect(missing.status).toBe(404);
+
+    const badKey = await call(handlerFor(alice), "/api/platform/settings/Not_Valid", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: 1 }),
+    });
+    expect(badKey.status).toBe(400);
+
+    const audit = await call(handlerFor(alice), "/api/platform/admin/audit?limit=10&action=settings.set");
+    expect(audit.status).toBe(200);
+    const entries = (audit.body as { entries: { action: string }[] }).entries;
+    expect(entries.some((row) => row.action === "settings.set")).toBe(true);
+    expect(JSON.stringify(audit.body)).not.toMatch(/gk_/);
+  });
 });

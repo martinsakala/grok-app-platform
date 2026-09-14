@@ -1,3 +1,4 @@
+import { audit } from "../audit/index.js";
 import { getInternalDatabase } from "../database/client.js";
 import { BadRequestError, ForbiddenError } from "../auth/errors.js";
 import { requireRole, type Principal } from "../auth/principal.js";
@@ -66,7 +67,7 @@ export async function setRoles(
   const grantsOwner = next.includes("owner");
 
   const db = await getInternalDatabase();
-  return db.transaction(async (tx) => {
+  const applied = await db.transaction(async (tx) => {
     await tx.query("select id from private.access_policy where id = 1 for update");
     const current = await tx.query<{ role: string }>(
       "select role from private.user_roles where user_id = $1",
@@ -99,4 +100,11 @@ export async function setRoles(
     }
     return next;
   });
+  await audit(principal, {
+    action: "roles.set",
+    entity: "user",
+    entityId: targetUserId,
+    meta: { roles: applied },
+  });
+  return applied;
 }

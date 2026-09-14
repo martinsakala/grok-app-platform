@@ -1,5 +1,6 @@
 import { getInternalDatabase } from "../database/client.js";
 import { ForbiddenError } from "../auth/errors.js";
+import type { Principal } from "../auth/principal.js";
 import { parseRoles, type Role } from "../auth/roles.js";
 import type { AuthUser } from "../auth/types.js";
 import { policyAllows, readPolicy } from "./policy.js";
@@ -26,7 +27,8 @@ export async function ensureUserRoles(
 ): Promise<Role[]> {
   const db = await getInternalDatabase();
   const listed = listedOwner(user, ownerEmails);
-  return db.transaction(async (tx) => {
+  type Outcome = { roles: Role[]; event?: { action: string } };
+  const outcome = await db.transaction(async (tx): Promise<Outcome> => {
     await tx.query("select id from private.access_policy where id = 1 for update");
     const existing = await tx.query<{ role: string }>(
       "select role from private.user_roles where user_id = $1",
@@ -41,11 +43,11 @@ export async function ensureUserRoles(
          on conflict do nothing`,
         [user.id],
       );
-      return parseRoles([...roles, "owner"]);
+      return { roles: parseRoles([...roles, "owner"]), event: { action: "owner.bootstrap" } };
     }
 
     if (roles.length > 0) {
-      return roles;
+      return { roles };
     }
 
     if (ownerEmails.length === 0) {
@@ -58,7 +60,7 @@ export async function ensureUserRoles(
            values ($1, 'owner', $1)`,
           [user.id],
         );
-        return ["owner"];
+        return { roles: ["owner"], event: { action: "owner.bootstrap" } };
       }
     }
 
@@ -72,6 +74,16 @@ export async function ensureUserRoles(
        on conflict do nothing`,
       [user.id],
     );
-    return ["member"];
+    return { roles: ["member"], event: { action: "member.auto" } };
   });
+  if (outcome.event) {
+    const principal: Principal = { kind: "user", user, roles: outcome.roles };
+    const { audit } = await import("../audit/index.js");
+    await audit(principal, {
+      action: outcome.event.action,
+      entity: "user",
+      entityId: user.id,
+    });
+  }
+  return outcome.roles;
 }
