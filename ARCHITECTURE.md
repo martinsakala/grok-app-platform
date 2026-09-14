@@ -90,3 +90,10 @@
     * Catch-all `app/routes/api/auth/$.ts` is a one-line adapter over Grok `auth.handler`. Login UI is application-owned.
     * Preview (after host injects the factory): one Grok PGlite. Production: one `DATABASE_URL`.
     * Canonical Better Auth schema is Grok `migrations/auth/0001_auth.sql`. Platform `0002_auth.sql` is a frozen compatibility bootstrap.
+
+22. Data API extension point (`src/data-api`):
+
+    * Positive allowlist of named resources over schema `api` only. Schema `api` is not an automatic publish surface.
+    * Hosts call `defineDataApi` + `listResource`. Every 0.5.0 resource requires `ownerColumn`; the server filters by the verified session user.
+    * HTTP routes are not part of the platform; host apps create thin GET adapters.
+    * `public`, `private`, and `app` are never published. Auth denylist is defense-in-depth.

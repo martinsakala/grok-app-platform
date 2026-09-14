@@ -41,7 +41,7 @@ Business/domain logic and platform runtime logic do not belong here. Alias `@/*`
 
 Host `package.json` already includes `pg` and `@electric-sql/pglite` in the Grok Build template. Better Auth is also pre-wired in host `src/lib/auth/` — do not rewrite it and do not add a second OAuth stack.
 
-Nitro's Vercel preset **does** need extra host glue for PGlite WASM assets. After `vite build`, copy `pglite.data`, `pglite.wasm`, and `initdb.wasm` from `node_modules/@electric-sql/pglite/dist/` next to the bundled `electric-sql__pglite*.mjs` (under `.vercel/output/functions/`). A `nitro({ hooks: { compiled } })` or Vite `closeBundle` plugin is the expected place. Dev mode does not need this — Vite SSR loads the files from `node_modules`. Sharing one preview PGlite does not remove this copy.
+Nitro's Vercel preset **does** need extra host glue for PGlite WASM assets. After `vite build`, copy `pglite.data`, `pglite.wasm`, and `initdb.wasm` from `node_modules/@electric-sql/pglite/dist/` next to the bundled `electric-sql__pglite*.mjs` (under `.vercel/output/functions/`). A Vite `closeBundle` plugin is the expected place. Do **not** replace `nitro({ hooks.compiled })` — the vercel preset uses that hook to write `.vercel/output/config.json` and `__server.func/.vc-config.json`. Dev mode does not need the copy — Vite SSR loads the files from `node_modules`. Sharing one preview PGlite does not remove this copy.
 
 ## 4. Application-owned database and auth files
 
@@ -50,9 +50,11 @@ app/migrations/*.sql
 app/migrations-api/*.sql
 app/db.server.ts              # setPgliteFactory + runMigrations + getDatabase
 app/auth.server.ts            # binds Grok session → platform requireUser/getCurrentUser
+app/data-api.ts               # optional 0.5.0 defineDataApi registry (application-owned)
 app/routes/api/health.ts      # thin adapter
 app/routes/api/version.ts     # thin adapter
 app/routes/api/auth/$.ts      # thin adapter → Grok auth.handler
+app/routes/api/data/$resource.ts  # optional 0.5.0 thin GET adapter
 app/routes/login.tsx          # application-owned Google sign-in UI
 ```
 

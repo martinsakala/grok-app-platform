@@ -8,6 +8,21 @@
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+## 0.5.0
+
+`breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion=2`.
+
+Read-only data API. **Subtree pull alone does not change application behavior.** Query traffic, migrations, and auth are unchanged from 0.4.2.
+
+To **enable** the capability in a host (not part of a blind upgrade):
+
+1. `git subtree pull --prefix=platform platform-upstream main --squash`.
+2. Add a new `app/migrations-api/000N_*.sql` view over the domain table (`CREATE VIEW api.<relation> AS SELECT <columns> FROM app.<table>`). Do not edit historical migration files, including `0002_auth.sql`.
+3. Pass that SQL into `runMigrations({ apiMigrations })` via Vite `?raw`.
+4. Register the resource with `defineDataApi` in application server code (`ownerColumn` required).
+5. Add a thin `GET /api/data/:resource` adapter that calls `requireUser` then `listResource`. Do not accept client SQL, schema, or `user_id` as identity.
+6. Keep `setPgliteFactory(() => getPglite())` from 0.4.1. Keep the host Nitro **closeBundle** PGlite wasm/data copy; do **not** replace `nitro({ hooks.compiled })` — that hook writes `.vercel/output/config.json`.
+
 ## 0.4.2
 
 `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion=2`.

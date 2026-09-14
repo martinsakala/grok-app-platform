@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+- Added a **read-only data API** (`src/data-api`): hosts register named resources over schema `api`; `listResource` returns an explicit column list for the verified session user.
+- Positive allowlist only. Schema `api` is required but not sufficient. `public`, `private`, and `app` are never published. Auth denylist remains defense-in-depth.
+- Every 0.5.0 resource requires `ownerColumn`. The server always filters by `requireUser().id`. Client `user_id`, schema, table, SQL, and column lists are ignored as authorization.
+- Identifiers are validated and quoted. Values are parameterized. Default page size 50, max 100, deterministic `ORDER BY` with `id` tiebreaker when present.
+- Failures return `DataApiError` without SQL, connection strings, or schema dumps. Anonymous access is `UnauthorizedError` (401).
+- No write, delete, RPC, arbitrary SQL, client joins, or generic filter language.
+- Platform upgrade is non-breaking (`requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion` remains 2). Enabling the capability is a host step: API view + registry + thin GET adapter. See `docs/DATA_API.md` and `docs/UPGRADING.md`.
+
 ## 0.4.2
 - Migration runner uses a **session-capable** Postgres connection for `pg_advisory_lock`. Query traffic (`getDatabase()`, Better Auth, `getSql()`) still uses `DATABASE_URL` as injected.
 - A local `pg.Pool` to a real Postgres session preserves backend state across per-file COMMIT. A **transaction pooler** (Neon `-pooler` hostname, PgBouncer port 6543, `pgbouncer=true`) does not — `pg.Pool.connect()` there is not a Postgres session.

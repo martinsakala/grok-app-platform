@@ -34,6 +34,7 @@ root host glue = host-owned
 * The platform must not create domain tables in `app`.
 * `api` contains only objects the application explicitly publishes (views/functions), never a dump of `app`.
 * A future generic data API is a **positive allowlist on schema `api` only**. Never auto-publish `public`, `private`, or `app`.
+* 0.5.0 `src/data-api` lists only host-registered resources. Every resource requires `ownerColumn`; identity comes from `requireUser`, never from a client `user_id`.
 * Downstream apps must not patch platform DB implementation (`platform/src/database/**`).
 * DB capability changes are made upstream, then pulled via `git subtree pull`.
 * Historical migration files are immutable after release; a new change is a new migration file.

@@ -131,10 +131,9 @@ Never log or return `DATABASE_URL`, hostname, username, database name, or driver
 | --- | --- | --- |
 | `private` | platform | Internal/operational data. Migration histories live here. **No application domain tables. Not part of any public data API.** |
 | `app` | application | Canonical domain model. Platform must not create domain tables here. |
-| `api` | application (explicit publish) | Views/functions the app chooses to expose. **The only future generic data-API allowlist.** |
-| `public` | Grok Better Auth (exception) | `"user"`, `"session"`, `"account"`, `"verification"` — required by Better Auth 1.6.x as wired by Grok. Canonical DDL is Grok `migrations/auth/0001_auth.sql`. Platform `0002_auth.sql` is a frozen `IF NOT EXISTS` bootstrap. Not a public data API. See `docs/AUTH.md`. |
+| `api` | application (explicit publish) | Views/functions the app chooses to expose. **The only data-API allowlist.** 0.5.0 still requires `defineDataApi` — an `api` view is not readable until registered. |
 
-Do not auto-publish `public`, `private`, or `app`.
+Do not auto-publish `public`, `private`, or `app`. See `docs/DATA_API.md`.
 
 ## Public API
 

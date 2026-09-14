@@ -6,7 +6,8 @@
   "exports": {
     "./runtime": "./src/runtime/index.ts",
     "./database": "./src/database/index.ts",
-    "./auth": "./src/auth/index.ts"
+    "./auth": "./src/auth/index.ts",
+    "./data-api": "./src/data-api/index.ts"
   },
   "scripts": {
     "generate:version": "node scripts/generate-platform-version.mjs",
