@@ -1,6 +1,6 @@
 import { getAccessPolicy, listUsers, setAccessPolicy, setRoles } from "../access/index.js";
 import { createApiKey, listApiKeys, revokeApiKey } from "../api-keys/index.js";
-import { listAudit } from "../audit/index.js";
+import { listAudit, audit } from "../audit/index.js";
 import {
   BadRequestError,
   isBadRequestError,
@@ -9,6 +9,7 @@ import {
   isUnauthorizedError,
   MethodNotAllowedError,
   requirePrincipal,
+  requireRole,
   type AuthSessionSource,
 } from "../auth/index.js";
 import { isDataApiError, listResource, type DataApiRegistry } from "../data-api/index.js";
@@ -17,7 +18,15 @@ import { createLogger, logError } from "../logging/index.js";
 import type { AppConfig } from "../runtime/types.js";
 import { getHealthResponse } from "../runtime/health.js";
 import {
+  applyOverride,
+  buildTimeTokens,
+  validateDesignOverride,
+  type DesignOverride,
+  type DesignTokens,
+} from "../design/index.js";
+import {
   deleteSetting,
+  getSetting,
   getSettingRecord,
   listSettings,
   setSetting,
@@ -35,6 +44,8 @@ export type PlatformHandlerOptions = {
   dataApi?: DataApiRegistry;
   getDatabase?: () => Promise<Database>;
   healthExtras?: () => Promise<Record<string, unknown>> | Record<string, unknown>;
+  /** Build-time `--pf-*` map from the host's generated design-tokens.css / design.md. */
+  designTokens?: DesignTokens | (() => DesignTokens | Promise<DesignTokens>);
 };
 
 type RouteParams = Record<string, string>;
@@ -248,9 +259,78 @@ async function listAuditRoute(ctx: RouteContext): Promise<Response> {
   return json(page);
 }
 
+async function resolveBuildTokens(options: PlatformHandlerOptions): Promise<DesignTokens> {
+  const provided = options.designTokens;
+  if (typeof provided === "function") {
+    return buildTimeTokens(null, await provided());
+  }
+  return buildTimeTokens(null, provided ?? null);
+}
+
+async function readDesignOverride(): Promise<DesignOverride | null> {
+  try {
+    const value = await getSetting<unknown>("platform.design", null);
+    if (value === null || value === undefined) return null;
+    return validateDesignOverride(value);
+  } catch (error) {
+    if (error instanceof BadRequestError) return null;
+    logError(logger, error, "design override read failed");
+    return null;
+  }
+}
+
+async function designPayload(options: PlatformHandlerOptions): Promise<{
+  tokens: DesignTokens;
+  override: DesignOverride | null;
+}> {
+  const build = await resolveBuildTokens(options);
+  const override = await readDesignOverride();
+  return { tokens: applyOverride(build, override), override };
+}
+
+async function getDesignRoute(ctx: RouteContext): Promise<Response> {
+  const payload = await designPayload(ctx.options);
+  return json(payload);
+}
+
+async function putDesignRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  requireRole(principal, "owner");
+  const body = await readJsonBody(ctx.request);
+  const override = validateDesignOverride(body);
+  await setSetting(principal, "platform.design", override);
+  await audit(principal, {
+    action: "design.set",
+    entity: "design",
+    entityId: "platform.design",
+    meta: { keys: Object.keys(override) },
+  });
+  return json(await designPayload(ctx.options));
+}
+
+async function deleteDesignRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  requireRole(principal, "owner");
+  try {
+    await deleteSetting(principal, "platform.design");
+  } catch (error) {
+    if (!(error instanceof BadRequestError)) throw error;
+  }
+  await audit(principal, {
+    action: "design.set",
+    entity: "design",
+    entityId: "platform.design",
+    meta: { reset: true },
+  });
+  return json(await designPayload(ctx.options));
+}
+
 const routes: Route[] = [
   { method: "GET", pattern: "/health", handler: healthRoute },
   { method: "GET", pattern: "/version", handler: versionRoute },
+  { method: "GET", pattern: "/design", handler: getDesignRoute },
+  { method: "PUT", pattern: "/design", handler: putDesignRoute },
+  { method: "DELETE", pattern: "/design", handler: deleteDesignRoute },
   { method: "GET", pattern: "/data/:resource", handler: dataRoute },
   { method: "GET", pattern: "/me", handler: meRoute },
   { method: "GET", pattern: "/admin/users", handler: adminUsersRoute },

@@ -10,10 +10,14 @@ export { AccessPolicyPage, type AccessPolicyPreview } from "./AccessPolicyPage.j
 export { ApiKeysPage, type ApiKeysPreview } from "./ApiKeysPage.js";
 export { SettingsPage, type SettingsPreview } from "./SettingsPage.js";
 export { AuditPage, type AuditPreview } from "./AuditPage.js";
+export { DesignPage, type DesignPreview } from "./DesignPage.js";
 export type {
   MeResponse,
   NavItem,
   HealthPayload,
   AccessPolicyInput,
   CreateApiKeyInput,
+  DesignResponse,
+  DesignOverride,
+  DesignTokens,
 } from "./types.js";

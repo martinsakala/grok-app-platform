@@ -6,6 +6,8 @@ import type {
   AuditPage,
   CreateApiKeyInput,
   CreatedApiKey,
+  DesignOverride,
+  DesignResponse,
   HealthPayload,
   ListAuditQuery,
   ListDataQuery,
@@ -41,6 +43,9 @@ export type PlatformClient = {
   deleteSetting: (key: string) => Promise<{ deleted: true }>;
   listAudit: (query?: ListAuditQuery) => Promise<AuditPage>;
   listData: (resource: string, query?: ListDataQuery) => Promise<ListResourceResult>;
+  getDesign: () => Promise<DesignResponse>;
+  setDesign: (override: DesignOverride) => Promise<DesignResponse>;
+  resetDesign: () => Promise<DesignResponse>;
 };
 
 function trimBase(baseUrl: string): string {
@@ -146,5 +151,12 @@ export function createPlatformClient(options: PlatformClientOptions = {}): Platf
           offset: query.offset,
         })}`,
       ),
+    getDesign: () => request<DesignResponse>("/design"),
+    setDesign: (override) =>
+      request<DesignResponse>("/design", {
+        method: "PUT",
+        body: JSON.stringify(override),
+      }),
+    resetDesign: () => request<DesignResponse>("/design", { method: "DELETE" }),
   };
 }

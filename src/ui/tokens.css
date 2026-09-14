@@ -1,14 +1,21 @@
-/* Platform UI tokens (0.9.0). Hosts import this file. 0.10 will add design.md. */
+/* Platform UI tokens. Hosts import this file or generated app/design-tokens.css (0.10). */
 :root {
   --pf-bg: #0f1115;
   --pf-fg: #e8eaed;
   --pf-muted: #9aa3b2;
   --pf-accent: #6ea8fe;
+  --pf-accent-fg: #0f1115;
   --pf-border: #2a3140;
   --pf-surface: #171b22;
   --pf-danger: #f87171;
+  --pf-ok: #34d399;
   --pf-radius: 0.75rem;
+  --pf-radius-sm: 0.375rem;
+  --pf-radius-lg: 1rem;
   --pf-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pf-heading-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pf-font-size: 16px;
+  --pf-density: comfortable;
 }
 
 .pf-root {

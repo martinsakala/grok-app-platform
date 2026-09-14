@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { DesignTokens } from "../design/index.js";
 import { AppShell } from "./AppShell.js";
 import type { NavItem } from "./types.js";
 
@@ -10,6 +11,7 @@ export const DEFAULT_ADMIN_NAV: NavItem[] = [
   { label: "Access policy", href: "/admin/access-policy" },
   { label: "API keys", href: "/admin/api-keys" },
   { label: "Settings", href: "/admin/settings" },
+  { label: "Design", href: "/admin/design" },
   { label: "Audit", href: "/admin/audit" },
 ];
 
@@ -19,6 +21,8 @@ export type AdminLayoutProps = {
   userSlot?: ReactNode;
   children?: ReactNode;
   onNavigate?: (href: string) => void;
+  tokens?: DesignTokens;
+  designUrl?: string;
 };
 
 export function AdminLayout({
@@ -27,9 +31,18 @@ export function AdminLayout({
   userSlot,
   children,
   onNavigate,
+  tokens,
+  designUrl,
 }: AdminLayoutProps) {
   return (
-    <AppShell appName={appName} nav={[]} userSlot={userSlot} onNavigate={onNavigate}>
+    <AppShell
+      appName={appName}
+      nav={[]}
+      userSlot={userSlot}
+      onNavigate={onNavigate}
+      tokens={tokens}
+      designUrl={designUrl}
+    >
       <div className="flex flex-col gap-6 md:flex-row">
         <aside className="w-full shrink-0 md:w-52">
           <nav className="flex flex-row flex-wrap gap-1 md:flex-col" aria-label="Admin">

@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { tokensToCss, type DesignTokens } from "../design/index.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { EmptyState } from "./states.js";
 import type { NavItem } from "./types.js";
@@ -11,6 +12,10 @@ export type AppShellProps = {
   userSlot?: ReactNode;
   children?: ReactNode;
   onNavigate?: (href: string) => void;
+  /** Build-time or preview tokens. Injected as a <style> block. */
+  tokens?: DesignTokens;
+  /** Public design endpoint. Fetched on mount; GUI overrides apply without rebuild. */
+  designUrl?: string;
 };
 
 function NavLink({
@@ -35,10 +40,46 @@ function NavLink({
   );
 }
 
-export function AppShell({ appName, nav = [], userSlot, children, onNavigate }: AppShellProps) {
+function DesignStyle({ tokens }: { tokens: DesignTokens }) {
+  const css = useMemo(() => tokensToCss(tokens), [tokens]);
+  return <style data-pf-design="">{css}</style>;
+}
+
+export function AppShell({
+  appName,
+  nav = [],
+  userSlot,
+  children,
+  onNavigate,
+  tokens,
+  designUrl,
+}: AppShellProps) {
+  const [liveTokens, setLiveTokens] = useState<DesignTokens | undefined>(tokens);
+  useEffect(() => {
+    setLiveTokens(tokens);
+  }, [tokens]);
+  useEffect(() => {
+    if (!designUrl) return;
+    let cancelled = false;
+    void fetch(designUrl, { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return (await response.json()) as { tokens?: DesignTokens };
+      })
+      .then((body) => {
+        if (cancelled || !body?.tokens) return;
+        setLiveTokens(body.tokens);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [designUrl]);
+
   const empty = children === undefined || children === null || children === false;
   return (
     <div className="pf-root flex min-h-screen flex-col">
+      {liveTokens ? <DesignStyle tokens={liveTokens} /> : null}
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--pf-border)] bg-[var(--pf-surface)] px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-base font-semibold tracking-tight text-[var(--pf-fg)]">{appName}</p>

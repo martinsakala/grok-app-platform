@@ -14,11 +14,13 @@
     "./api-keys": "./src/api-keys/index.ts",
     "./settings": "./src/settings/index.ts",
     "./audit": "./src/audit/index.ts",
-    "./ui": "./src/ui/index.ts"
+    "./ui": "./src/ui/index.ts",
+    "./design": "./src/design/index.ts"
   },
   "scripts": {
     "generate:version": "node scripts/generate-platform-version.mjs",
     "generate:migrations": "node scripts/generate-platform-migrations.mjs",
+    "generate:design": "node --experimental-strip-types scripts/generate-design-tokens.mjs",
     "generate": "npm run generate:version && npm run generate:migrations",
     "pretest": "npm run generate",
     "pretypecheck": "npm run generate",

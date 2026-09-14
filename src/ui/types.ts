@@ -4,10 +4,16 @@ import type { ListedUser } from "../access/users.js";
 import type { ApiKeyView, CreatedApiKey } from "../api-keys/keys.js";
 import type { AuditEntry } from "../audit/audit.js";
 import type { ListResourceResult } from "../data-api/types.js";
+import type { DesignOverride, DesignTokens } from "../design/index.js";
 import type { HealthResponse, VersionResponse } from "../runtime/types.js";
 import type { SettingRecord } from "../settings/settings.js";
 
-export type { Role, AccessPolicy, ListedUser, ApiKeyView, CreatedApiKey, AuditEntry, ListResourceResult, HealthResponse, VersionResponse, SettingRecord };
+export type { Role, AccessPolicy, ListedUser, ApiKeyView, CreatedApiKey, AuditEntry, ListResourceResult, HealthResponse, VersionResponse, SettingRecord, DesignOverride, DesignTokens };
+
+export type DesignResponse = {
+  tokens: DesignTokens;
+  override: DesignOverride | null;
+};
 
 export type MeUser = {
   kind: "user";

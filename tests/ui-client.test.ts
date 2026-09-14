@@ -96,4 +96,31 @@ describe("createPlatformClient", () => {
     const health = await client.health();
     expect(health.status).toBe("ok");
   });
+
+  it("GET/PUT/DELETE /design", async () => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/design") && (!init?.method || init.method === "GET")) {
+        return jsonResponse(200, { tokens: { "--pf-bg": "#0f1115" }, override: null });
+      }
+      if (url.endsWith("/design") && init?.method === "PUT") {
+        expect(init.body).toBe(JSON.stringify({ colors: { accent: "#ff00aa" } }));
+        return jsonResponse(200, {
+          tokens: { "--pf-bg": "#0f1115", "--pf-accent": "#ff00aa" },
+          override: { colors: { accent: "#ff00aa" } },
+        });
+      }
+      if (url.endsWith("/design") && init?.method === "DELETE") {
+        return jsonResponse(200, { tokens: { "--pf-bg": "#0f1115" }, override: null });
+      }
+      return jsonResponse(500, { error: "Internal Server Error" });
+    });
+    const client = createPlatformClient({ fetch: fetchFn as unknown as typeof fetch });
+    const got = await client.getDesign();
+    expect(got.override).toBeNull();
+    const set = await client.setDesign({ colors: { accent: "#ff00aa" } });
+    expect(set.tokens["--pf-accent"]).toBe("#ff00aa");
+    const reset = await client.resetDesign();
+    expect(reset.override).toBeNull();
+  });
 });

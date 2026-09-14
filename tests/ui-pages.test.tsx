@@ -1,11 +1,13 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { PLATFORM_VERSION } from "../src/runtime/generated/platform-version.js";
+import { DEFAULT_TOKENS } from "../src/design/index.js";
 import { AccessPolicyPage } from "../src/ui/AccessPolicyPage.js";
 import { AdminLayout } from "../src/ui/AdminLayout.js";
 import { ApiKeysPage } from "../src/ui/ApiKeysPage.js";
 import { AppShell } from "../src/ui/AppShell.js";
 import { AuditPage } from "../src/ui/AuditPage.js";
+import { DesignPage } from "../src/ui/DesignPage.js";
 import { ErrorBoundary } from "../src/ui/ErrorBoundary.js";
 import { PlatformClientError } from "../src/ui/errors.js";
 import { SettingsPage } from "../src/ui/SettingsPage.js";
@@ -35,7 +37,10 @@ function unusedClient(): PlatformClient {
     deleteSetting: fail,
     listAudit: fail,
     listData: fail,
-  } as unknown as PlatformClient;
+    getDesign: fail,
+    setDesign: fail,
+    resetDesign: fail,
+  };
 }
 
 const owner: MeResponse = {
@@ -80,6 +85,16 @@ describe("platform UI pages", () => {
     );
     expect(admin).toContain("Access policy");
     expect(admin).toContain("Admin body");
+    expect(admin).toContain("Design");
+    expect(admin).toContain('href="/admin/design"');
+    const withTokens = renderToString(
+      <AppShell appName="mother-app" tokens={{ "--pf-bg": "#111111", "--pf-accent": "#abcdef" }}>
+        <p>Hello</p>
+      </AppShell>,
+    );
+    expect(withTokens).toContain("data-pf-design");
+    expect(withTokens).toContain("--pf-bg: #111111;");
+    expect(withTokens).toContain("--pf-accent: #abcdef;");
   });
 
   it("StatusPage states", () => {
@@ -278,6 +293,36 @@ describe("platform UI pages", () => {
     );
     expect(data).toContain("owner.bootstrap");
     expect(data).toContain("Load more");
+  });
+
+  it("DesignPage states", () => {
+    expect(renderToString(<DesignPage client={client} preview={{ status: "loading" }} />)).toContain(
+      "Loading design",
+    );
+    expect(renderToString(<DesignPage client={client} preview={{ status: "forbidden" }} />)).toContain(
+      "Forbidden",
+    );
+    expect(renderToString(<DesignPage client={client} preview={{ status: "forbidden" }} />)).toContain(
+      "Owner role required",
+    );
+    expect(
+      renderToString(<DesignPage client={client} preview={{ status: "error", error: new Error("boom") }} />),
+    ).toContain("boom");
+    const data = renderToString(
+      <DesignPage
+        client={client}
+        preview={{
+          status: "data",
+          me: owner,
+          design: { tokens: DEFAULT_TOKENS, override: null },
+        }}
+      />,
+    );
+    expect(data).toContain("data-design-preview");
+    expect(data).toContain("platform.design");
+    expect(data).toContain("Reset");
+    expect(data).toContain("Save");
+    expect(data).toContain(DEFAULT_TOKENS["--pf-accent"]);
   });
 
   it("member UsersPage 403 vs owner data; client error mapping 403", () => {
