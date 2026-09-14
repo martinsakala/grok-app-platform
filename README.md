@@ -61,14 +61,14 @@ domain layer on top of an unchanged, upgradable platform.
 | `runtime` | `platform/src/runtime` | `defineAppConfig`, `/api/version` and `/api/health` payload builders, platform version constant |
 | `database` | `platform/src/database` | `getDatabase()` (PGlite in preview, `pg` Pool in production), `runMigrations()` with per-file transactions, SHA-256 checksums and a session-level advisory lock, pooler-aware connection resolution |
 | `auth` | `platform/src/auth` | `requireUser` / `getCurrentUser` / `getCurrentSession` over the Grok Better Auth session, `assignOwner`, `ownerIdFromSession`. No OAuth implemented here. |
-| `data-api` | `platform/src/data-api` | `defineDataApi` + `listResource`: read-only, allowlisted, owner-scoped list over views in schema `api`; offset and signed keyset `cursor` |
+| `data-api` | `platform/src/data-api` | `defineDataApi` + `listResource` + `exportResource`: read-only, allowlisted, owner-scoped list/export over views in schema `api`; offset and signed keyset `cursor`; CSV / NDJSON export |
 | `logging` | `platform/src/logging` | `createLogger` / `logError`: one JSON line, secret keys and connection strings redacted |
-| `http` | `platform/src/http` | `createPlatformHandler`: `/api/platform/health`, `/version`, `/data/:resource`, plus `/me`, `/admin/*`, `/api-keys`, `/settings`, `/admin/audit`, `/design` (import / export / gallery) |
+| `http` | `platform/src/http` | `createPlatformHandler`: `/api/platform/health`, `/version`, `/data/:resource` (+ `/export`, `GET /data`), plus `/me`, `/admin/*`, `/api-keys`, `/settings`, `/admin/audit`, `/design` (import / export / gallery), `/mutations` |
 | `access` | `platform/src/access` | roles, first-user-as-owner bootstrap, allowlist policy |
 | `api-keys` | `platform/src/api-keys` | hashed `gk_` keys; plaintext once; data scoped to the key owner |
 | `settings` | `platform/src/settings` | JSON documents in `private.settings`; `platform.*` owner-only writes |
 | `audit` | `platform/src/audit` | append-only `private.audit_log`; admin cursor list; no retention job |
-| `ui` | `platform/src/ui` | typed `createPlatformClient`, AppShell / AdminLayout, admin pages (incl. Design), `--pf-*` tokens. Host mounts; no router in the platform |
+| `ui` | `platform/src/ui` | typed `createPlatformClient`, AppShell / AdminLayout, admin pages (incl. Design, Mutations, Data), `--pf-*` tokens. Host mounts; no router in the platform |
 | `design` | `platform/src/design` | `design.md` parser, `--pf-*` CSS generator, runtime document/form overlay, gallery presets, `DESIGN_PROMPT`. Voice never becomes CSS |
 | `mutations` | `platform/src/mutations` | `defineMutations` + `POST /mutations/:name`: transactional host writes, same contract for GUI and API keys |
 
@@ -84,6 +84,8 @@ file, not the database). 0.12.0 adds **keyset `cursor` pagination** on
 `GET /api/platform/data/:resource` (`nextCursor`; old `offset` still works).
 0.13.0 adds **mutations**: host-registered writes with audit and optional
 idempotency, callable from `MutationsPage` or an API key.
+0.14.0 adds **data export**: `GET /api/platform/data/:resource/export`
+(CSV / NDJSON, same owner filter as list) and optional `DataResourcesPage`.
 Hosts that landed `/platform` as a snapshot (no subtree
 metadata) copy the upstream tree instead of `git subtree pull` — `docs/UPGRADING.md`.
 

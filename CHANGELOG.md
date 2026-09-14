@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0
+- **Data export.** `exportResource` streams owner-scoped rows via `listResource` keyset pages (`MAX_PAGE_SIZE`). CSV (RFC 4180, LF, no BOM, null empty, Date ISO, objects JSON, formula-injection prefix `'` on `= + - @`) and NDJSON (`format=json`). Cap default 100000; `createPlatformHandler({ exportMaxRows })`; setting `platform.export.max-rows` (lowercase; not `maxRows`) may only lower it. Cap hit → stream stops, `X-Export-Truncated: true`. Filename `<resource>-<YYYYMMDD-HHmmss>.csv|ndjson`.
+- **HTTP:** `GET /api/platform/data/:resource/export?format=csv|json&limit=N` (session or API key). `GET /api/platform/data` lists `{ name, columns, orderBy }`. 400 `invalid_input` / 401 / 404 before the stream. Mid-stream errors abort and log, never SQL.
+- **Audit:** `data.export` with `{ resource, format, rows, truncated, principal }` — never the row payload.
+- **UI:** `DataResourcesPage` (member+), client `listDataResources` / `exportData` (returns `Response` for blob download with bearer).
+- Host: `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion` remains **7**. Optional `/admin/data` with `DataResourcesPage` (recommended for mother-app). No new SQL. No historical migration edits.
+
 ## 0.13.0
 - **Mutations** (`src/mutations`): `defineMutations` registers named writes (`kebab-case`, description, input schema, roles, handler). Built-in JSON validator (string/number/boolean/integer/array/object, required, enum, min/max/maxLength, items, properties). Unknown keys rejected. Handler `ctx = { principal, db, input, logger, request: { id } }` runs in a transaction; `ctx.db` is that transaction. `MutationError("conflict")` → 409. Owner scoping is the handler's job (`mutationOwnerId` + `WHERE user_id = …`). Client `user_id` is never identity.
 - **HTTP:** `GET /mutations` (principal, filtered by role), `POST /mutations/:name` (session or API key). `200 { ok, result }`. `400 invalid_input` with `{ path, message }[]`, `401`, `403`, `404 unknown_mutation`, `409 conflict` / `idempotency_mismatch`, `500 mutation_failed` (details in the logger only). Optional `Idempotency-Key` (24 h, `private.idempotency_keys`, lazy delete).

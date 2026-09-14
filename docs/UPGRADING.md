@@ -74,6 +74,31 @@ When a host **does** still have subtree metadata, `git subtree pull` remains
 the documented path for that host.
 
 
+## 0.14.0
+
+`breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`,
+`appContractVersion=7` (unchanged).
+
+Owner-scoped CSV / NDJSON export of registered data-API resources. No new
+SQL. Do not edit historical migrations. Hosts that already list via
+`GET /api/platform/data/:resource` get export and `GET /data` without code
+changes.
+
+1. Upgrade `/platform` (subtree pull **or** snapshot overlay above) to 0.14.0.
+   Confirm `platform/VERSION` is `0.14.0` and `/platform` has 0 diffs against
+   the release SHA.
+2. Optional: mount `DataResourcesPage` at `/admin/data` (member+). Recommended
+   as a mother-app default so GUI and an LLM share the same export.
+3. Optional: pass `exportMaxRows` into `createPlatformHandler`. Owner setting
+   `platform.export.max-rows` (lowercase — the settings regex rejects
+   `maxRows`) may only lower that cap. Default 100000.
+4. Keep `setPgliteFactory` and the Nitro **closeBundle** PGlite copy; do
+   **not** replace `nitro({ hooks.compiled })`.
+
+See `docs/DATA_API.md`. A bad `format` is `400 invalid_input`. Cap hit sets
+`X-Export-Truncated: true`. Audit `data.export` never stores row payload.
+
+
 ## 0.13.0
 
 `breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=true`

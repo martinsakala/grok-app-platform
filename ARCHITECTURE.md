@@ -99,7 +99,7 @@
 
 23. HTTP extension point (`src/http`):
 
-    * `createPlatformHandler({ appConfig, sessionSource, dataApi, getDatabase, healthExtras, designTokens, designMarkdown, mutations })`.
+    * `createPlatformHandler({ appConfig, sessionSource, dataApi, getDatabase, healthExtras, designTokens, designMarkdown, mutations, exportMaxRows })`.
     * Internal registry of method + path (GET/POST/PUT/DELETE). New capabilities add routes here, not in the host.
     * Prefix `/api/platform`. Host aliases keep `/api/health`, `/api/version`, `/api/data/:resource`.
     * 0.7.0: `/me`, `/admin/users`, `/admin/access-policy`, `/api-keys`. Known path + wrong method is 405.
@@ -111,6 +111,7 @@
     * Hosts call `defineDataApi` + `listResource`. Every resource requires `ownerColumn`; the server filters by `ownerIdOf(principal)` (session user or API-key owner).
     * `uniqueBy` (implicit `id` when `id` is returned) makes `ORDER BY` unique within one owner. It need not be in `columns`. The application owns that uniqueness. OFFSET is not a snapshot. 0.12.0 adds a signed keyset `cursor` over `(orderBy, uniqueBy)`; `nextCursor` is additive.
     * HTTP for list is `GET /api/platform/data/:resource` via `createPlatformHandler`. Hosts keep a thin catch-all; they do not reimplement list routing.
+    * 0.14.0 `exportResource` streams the same owner-scoped rows as CSV or NDJSON. Cap `exportMaxRows` (default 100000); setting `platform.export.max-rows` may only lower it. `GET /data` lists `{ name, columns, orderBy }`.
     * `public`, `private`, and `app` are never published. Auth denylist is defense-in-depth.
 
 24a. Mutations extension point (`src/mutations`):
@@ -136,11 +137,12 @@
     * `private.settings` JSON documents. Key regex `^[a-z][a-z0-9_.-]{0,99}$`. Value ≤ 64 KiB.
     * `platform.*` writes require `owner`. Other writes require `admin`. Reads require `member`.
     * HTTP: `/api/platform/settings` and `/settings/:key`. `getSetting(key, fallback)` has no ACL (server defaults).
+    * `platform.export.max-rows` (0.14.0) may only lower the export cap.
 
 28. Audit extension point (`src/audit`):
 
     * `private.audit_log` is append-only. `audit()` redacts meta and never throws.
-    * Automatic rows for owner bootstrap, auto-member, role/policy/API-key/settings changes, and `design.set`.
+    * Automatic rows for owner bootstrap, auto-member, role/policy/API-key/settings changes, `design.set` / `design.import`, `mutation.<name>`, and `data.export`.
     * `GET /api/platform/admin/audit` is admin+, cursor by `id` desc. No retention in 0.8.0.
 
 29. UI extension point (`src/ui`):
@@ -150,7 +152,8 @@
     * Hosts pass `href` / `onNavigate` / `userSlot`. The platform does not import a router.
     * Tokens live in `src/ui/tokens.css` (`--pf-*`). Tailwind v4 hosts must `@source` this directory.
     * `AppShell` accepts `tokens` / `designUrl` and injects a `<style>` block so GUI overrides apply without rebuild.
-    * `appContractVersion` 5. Login UI remains application-owned.
+    * Pages include Status, Users, Access, API keys, Data (`DataResourcesPage`), Settings, Mutations, Design, Audit.
+    * `appContractVersion` 7. Login UI remains application-owned.
 
 30. Design extension point (`src/design`):
 

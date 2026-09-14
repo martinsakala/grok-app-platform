@@ -36,6 +36,7 @@ await audit(principal, {
 | `design.set` | owner saved or reset `platform.design` |
 | `design.import` | owner imported markdown or a gallery preset |
 | `mutation.<name>` | `POST /mutations/:name` (every authenticated attempt) |
+| `data.export` | `GET /data/:resource/export` after a successful start |
 
 Existing owner `/me` calls are not logged.
 
@@ -60,3 +61,7 @@ Unsigned → `401`. `member` → `403`. Invalid `limit`/`before` → `400`.
 `mutation.<name>` meta is `{ outcome, inputSha256, requestId, principalKind, principalId }`.
 `outcome` is `ok` | `invalid_input` | `forbidden` | `failed` | `conflict` |
 `replayed`. The request body is never stored. See `docs/MUTATIONS.md`.
+
+`data.export` meta is `{ resource, format, rows, truncated, principal }`.
+`principal` is `{ kind, id }` (user id or API-key id). The exported rows
+are never stored. See `docs/DATA_API.md`.

@@ -43,3 +43,9 @@ tokens). Do not store API keys or passwords in settings values.
 0.10 form subset); prefer `/api/platform/design` (import / PUT / DELETE, audit
 `design.import` / `design.set`) over writing that key through this API. See
 `docs/DESIGN.md`.
+
+`platform.export.max-rows` (0.14.0, owner write) is a positive integer that
+may **only lower** the handler `exportMaxRows` cap (default 100000). Setting
+keys are lowercase (`^[a-z][a-z0-9_.-]{0,99}$`), so this is `max-rows`, not
+`maxRows`. A larger value is ignored. Invalid values are ignored and the
+handler cap stands. See `docs/DATA_API.md`.

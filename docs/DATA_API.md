@@ -1,12 +1,12 @@
-# Data API (0.5.1 / 0.12.0)
+# Data API (0.5.1 / 0.12.0 / 0.14.0)
 
 Safe **read-only** list of explicitly registered resources. Schema `api` is
 required but **not sufficient**: nothing is published until the host registers
 it.
 
-## What 0.5.x / 0.12.0 is
+## What 0.5.x / 0.12.0 / 0.14.0 is
 
-| Allowed | Not in 0.5.x / 0.12.0 |
+| Allowed | Not in 0.5.x / 0.12.0 / 0.14.0 |
 | --- | --- |
 | `GET` list of one named resource | write, delete, RPC |
 | Verified session user or API key | anonymous access |
@@ -15,10 +15,12 @@ it.
 | Parameterized values | client SQL / schema / table names |
 | Default/max page size + unique `ORDER BY` | generic filter language, client joins |
 | Offset pages **and** signed keyset `cursor` (0.12.0) | snapshot isolation of the list |
+| Owner-scoped **export** CSV / NDJSON (0.14.0) | raising the export cap from a setting |
 
 0.5.1 does **not** add product features or change auth. It makes list order
 unique without requiring the unique column to be returned. 0.12.0 adds
-opaque keyset cursors on top of that order. `appContractVersion` stays 6.
+opaque keyset cursors on top of that order. 0.14.0 streams the same
+owner-scoped rows as a download. `appContractVersion` stays 7.
 
 ## Registration
 
@@ -111,6 +113,52 @@ const page = await listResource(dataApi, db, {
 HTTP: `GET /api/platform/data/:resource?cursor=&limit=` (session or `gk_`
 key, same as before). Client: `listData(resource, { limit, cursor })`.
 
+## Export (0.14.0)
+
+`exportResource` streams the same owner-scoped rows as `listResource`. It
+pages internally with the keyset cursor at `MAX_PAGE_SIZE`. The client
+never supplies a cursor, SQL, schema, table, or `user_id`.
+
+```ts
+const exported = await exportResource(
+  dataApi,
+  db,
+  { resource: "auth-test-items", user, format: "csv", limit },
+  { maxRows },
+);
+```
+
+`format` is `csv` or `json` (NDJSON). Anything else is `400 invalid_input`
+before the stream starts.
+
+| Format | `Content-Type` | Body |
+| --- | --- | --- |
+| `csv` | `text/csv; charset=utf-8` | RFC 4180, LF, no BOM. Header = `columns`. `null` → empty. `Date` → ISO-8601. objects → JSON string. Values starting `=`, `+`, `-`, `@` are prefixed with `'` (formula injection). |
+| `json` | `application/x-ndjson` | One JSON object per line. No header row. |
+
+Filename: `<resource>-<YYYYMMDD-HHmmss>.csv` or `.ndjson` (UTC).
+
+### Cap
+
+Default hard cap is **100000** rows (`DEFAULT_EXPORT_MAX_ROWS`).
+`createPlatformHandler({ exportMaxRows })` sets the handler cap.
+Setting `platform.export.max-rows` (owner-only; keys are lowercase — not
+`maxRows`) may **only lower** it. A request `limit` cannot exceed the
+resolved cap.
+
+When the owner has more rows than the cap, the stream stops at the cap and
+the response includes `X-Export-Truncated: true`. The body stays clean
+data (no warning row).
+
+HTTP: `GET /api/platform/data/:resource/export?format=csv|json&limit=N`
+(session or `gk_` key). `GET /api/platform/data` (principal) lists
+`{ name, columns, orderBy }[]` for the registry. Client:
+`listDataResources()`, `exportData(resource, { format, limit })` returns
+the `Response` (blob download, bearer attached).
+
+A stream failure after headers are sent is logged (`logError`) and the
+stream is aborted. The 500 body never includes SQL.
+
 ## Stable order vs consistent snapshot
 
 A unique `ORDER BY` means that **for a frozen set of rows** OFFSET pages do
@@ -159,7 +207,7 @@ dumps.
 
 | code | status | when |
 | --- | --- | --- |
-| `invalid_input` | 400 | bad resource name or page params |
+| `invalid_input` | 400 | bad resource name, page params, or export `format` / `limit` |
 | `invalid_cursor` | 400 | malformed, unsigned, or foreign-resource cursor |
 | `invalid_identifier` | 400 | bad SQL identifier at registration |
 | `forbidden` | 403 | public/private/app or denylisted relation |

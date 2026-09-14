@@ -11,7 +11,9 @@ owner `PUT`/`DELETE /design`. 0.11.0 adds owner `POST /design/import`,
 `GET /design/export`, `GET /design/gallery`, and optional handler
 `designMarkdown`. 0.12.0 adds `?cursor=` on `GET /data/:resource` (signed
 keyset; `invalid_cursor` is 400). 0.13.0 adds `GET /mutations` and
-`POST /mutations/:name` (optional handler `mutations`).
+`POST /mutations/:name` (optional handler `mutations`). 0.14.0 adds
+`GET /data` (registry) and `GET /data/:resource/export` (CSV / NDJSON stream;
+optional handler `exportMaxRows`).
 
 ## Prefix
 
@@ -24,6 +26,8 @@ the host rewrites those paths onto the same handler.
 | `GET` | `/api/platform/health` | public |
 | `GET` | `/api/platform/version` | public |
 | `GET` | `/api/platform/data/:resource` | principal (session or `gk_` key). Query `limit`, `offset`, `cursor` |
+| `GET` | `/api/platform/data/:resource/export` | principal. Query `format=csv\|json`, `limit`. Stream. `X-Export-Truncated` when capped |
+| `GET` | `/api/platform/data` | principal. `{ resources: [{ name, columns, orderBy }] }` |
 | `GET` | `/api/platform/me` | principal |
 | `GET` | `/api/platform/admin/users` | admin+ |
 | `PUT` | `/api/platform/admin/users/:id/roles` | admin+ |
@@ -61,6 +65,7 @@ export const handlePlatform = createPlatformHandler({
   designTokens,   // optional explicit --pf-* map; wins over designMarkdown
   designMarkdown, // optional raw design.md; tokens derived when designTokens omitted
   mutations,      // optional defineMutations({ mutations }); omit → /mutations is 404
+  exportMaxRows,  // optional hard cap for data export; default 100000
 });
 ```
 
@@ -74,8 +79,18 @@ A bad cursor is `DataApiError` `400 invalid_cursor`, never 500.
 payload. Use it for host-only fields such as `connection` and
 `databaseShared`. Do not put secrets there.
 
-If `dataApi` or `getDatabase` is omitted, `GET /data/:resource` is `404
-not_found`.
+If `dataApi` or `getDatabase` is omitted, `GET /data/:resource` and
+`GET /data/:resource/export` are `404 not_found`. `GET /data` is `404`
+when `dataApi` is omitted.
+
+Export (`docs/DATA_API.md`): `format` must be `csv` or `json` (`400
+invalid_input` otherwise). Body is a `ReadableStream`. Headers:
+`Content-Type` `text/csv; charset=utf-8` or `application/x-ndjson`,
+`Content-Disposition: attachment; filename="<resource>-<YYYYMMDD-HHmmss>.csv|ndjson"`,
+`Cache-Control: no-store`. When the owner has more rows than the cap,
+`X-Export-Truncated: true`. Mid-stream errors abort the stream and are
+logged; they never include SQL. Setting `platform.export.max-rows` may
+only lower `exportMaxRows`.
 
 ## Errors
 
@@ -95,7 +110,7 @@ not_found`.
 | anything else | 500 | `{ "error": "Internal Server Error" }` + `logError` |
 
 500 bodies never include SQL, driver text, or connection strings. Unknown
-resources are `DataApiError` `404 unknown_resource`. Access routes: see `docs/ACCESS.md`. Settings: `docs/SETTINGS.md`. Audit: `docs/AUDIT.md`. Design: `docs/DESIGN.md`. Mutations: `docs/MUTATIONS.md`.
+resources are `DataApiError` `404 unknown_resource`. Access routes: see `docs/ACCESS.md`. Settings: `docs/SETTINGS.md`. Audit: `docs/AUDIT.md`. Design: `docs/DESIGN.md`. Mutations: `docs/MUTATIONS.md`. Data export: `docs/DATA_API.md`.
 
 ## Host wiring
 

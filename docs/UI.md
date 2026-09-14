@@ -29,6 +29,8 @@ Typed methods cover every 0.8.0 route plus 0.10.0/0.11.0 design: `me`, `health`,
 `listApiKeys` / `createApiKey` / `revokeApiKey`, `listSettings` /
 `getSetting` / `setSetting` / `deleteSetting`, `listAudit`,
 `listData(resource, { limit, offset, cursor })`,
+`listDataResources()`, `exportData(resource, { format, limit })` (returns
+the raw `Response` so the host can blob-download with the bearer),
 `getDesign` / `setDesign` / `resetDesign` / `importDesign` / `exportDesign` /
 `listDesignGallery`, `listMutations` / `runMutation(name, input, { idempotencyKey })`.
 
@@ -44,7 +46,7 @@ Pages take a `client` prop. They must not call `fetch` themselves.
 | Export | Role |
 | --- | --- |
 | `AppShell` | Header, nav (`{label, href}[]`), `userSlot`, main, empty state, `ErrorBoundary`. Optional `tokens` / `designUrl` injects `--pf-*` |
-| `AdminLayout` | `AppShell` plus side nav (default `/admin/*` hrefs, including Design) |
+| `AdminLayout` | `AppShell` plus side nav (default `/admin/*` hrefs, including Data / Mutations / Design) | |
 | `StatusPage` | Health, version, `/me`. Compares version to `PLATFORM_VERSION`, never a hardcoded string |
 | `UsersPage` | Admin+: list + role editor. Owner-only edits of owners |
 | `AccessPolicyPage` | Owner: mode, domains, emails |
@@ -53,6 +55,7 @@ Pages take a `client` prop. They must not call `fetch` themselves.
 | `AuditPage` | Admin+: `before=id` pagination and action/entity filters |
 | `DesignPage` | Owner: Import (paste/upload/Validate/Apply), Gallery (Use), Export (Download `design.md` + copy LLM prompt), Fine-tune, Reset |
 | `MutationsPage` | Member+: list of mutations the caller can run, schema form, Run, result or field errors |
+| `DataResourcesPage` | Member+: registered resources, first-20 preview, Export CSV / Export NDJSON (fetch + blob, bearer) |
 
 Every page has loading / empty / error / 403 states. Optional `preview` is
 for tests (`renderToString`); hosts omit it.
@@ -95,7 +98,9 @@ rebuild. Do not invent a second token set in the host. Voice stays in
    app/routes/admin/users.tsx           UsersPage
    app/routes/admin/access-policy.tsx   AccessPolicyPage
    app/routes/admin/api-keys.tsx        ApiKeysPage
+   app/routes/admin/data.tsx            DataResourcesPage
    app/routes/admin/settings.tsx        SettingsPage
+   app/routes/admin/mutations.tsx       MutationsPage
    app/routes/admin/design.tsx          DesignPage
    app/routes/admin/audit.tsx           AuditPage
    ```

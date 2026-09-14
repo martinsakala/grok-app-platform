@@ -86,6 +86,9 @@ TanStack `srcDirectory: "app"`, alias `@/*` → `/app/*`. Import Grok chrome fro
   a parallel ad-hoc server function for the same write. Owner scoping is
   `mutationOwnerId(ctx.principal)` and `WHERE user_id = owner`. Mount
   `MutationsPage` at `/admin/mutations`.
+- Mount `DataResourcesPage` at `/admin/data` (0.14.0, recommended). Export
+  is the same owner-scoped read as `listResource`. Do not add a parallel
+  CSV dump that bypasses the data API.
 
 ## Before reporting done
 

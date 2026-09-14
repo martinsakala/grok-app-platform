@@ -64,6 +64,7 @@ git subtree add --prefix=platform platform-upstream main --squash
 | `app/auth.server.ts` | binds Grok `auth.api.getSession` to platform `createAuthSessionSource`; exports `requireUser`, `getCurrentUser`, `getCurrentSession` |
 | `app/data-api.ts` | `defineDataApi({ resources: [...] })` |
 | `app/mutations.ts` | `defineMutations({ mutations: [] })` (0.13.0); pass into the handler |
+| `app/routes/admin/data.tsx` | optional 0.14.0 `DataResourcesPage` (recommended mother-app default) |
 | `app/migrations/000N_*.sql` | domain tables in schema `app` |
 | `app/migrations-api/000N_*.sql` | `CREATE VIEW api.<name> AS SELECT <explicit columns> FROM app.<table>` |
 | `app/routes/api/platform/$.ts` | catch-all → `createPlatformHandler` |
