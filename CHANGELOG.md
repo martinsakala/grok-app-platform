@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+- **Principal** (`src/auth`): `requirePrincipal` is a signed-in user or an API key (`gk_…`). `Role` is `owner` ⊇ `admin` ⊇ `member`. `requireRole` / `hasRole`. `requireUser` stays. `assignOwner` / `ownerIdFromSession` / data-API list accept `Principal` or `AuthUser`. Client `user_id` is still never identity.
+- **Access** (`src/access`, migration `0003_access.sql`): first authenticated user becomes `owner` (serialized on `private.access_policy`). Later users become `member` if the allowlist allows them. Default mode is `open`; switch new apps to `allowlist`. Owner always passes. `listUsers` / `setRoles` (admin+; last owner cannot be dropped; admin cannot change an owner). `getAccessPolicy` / `setAccessPolicy` (owner).
+- **API keys** (`src/api-keys`): `gk_` + 32 random bytes (base64url), SHA-256 hash stored, plaintext returned once. Roles cannot exceed the creator. Data API scoped to `ownerUserId`. Revoke → 401. Key and hash are never logged.
+- **HTTP**: POST/PUT/DELETE, JSON body limit, 405 for known path + wrong method, 400 invalid JSON. New routes: `/me`, `/admin/users`, `/admin/users/:id/roles`, `/admin/access-policy`, `/api-keys`. `/data/:resource` uses `requirePrincipal`. Host catch-all unchanged (`requiresAppChanges=false`).
+- `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=true`, `appContractVersion` remains 3. No historical migration edits.
+
 ## 0.6.0
 - **Logger** (`src/logging`): `createLogger(name)` writes one JSON line `{ts, level, name, msg, ...fields}`. `setLogSink` is the pluggable output (default `console`). Keys matching `SECRET_KEY_PATTERN` become `"[redacted]"`; string values are scrubbed of `postgres://` / `postgresql://` URLs and Bearer tokens. `logError` records `{name, code, message}` only — no stack, no DB URL/host/user. Platform `console.error("[platform] … failed")` sites now call `logError` with the caught error.
 - **HTTP router** (`src/http`): `createPlatformHandler` serves `GET /api/platform/health`, `/version`, `/data/:resource` from an internal method+path registry. Future capabilities add routes inside the platform; hosts keep one catch-all. Errors: `UnauthorizedError` → 401 `{error:"Unauthorized"}`; `DataApiError` → its status/code; anything else → 500 `{error:"Internal Server Error"}` plus `logError`. Unknown routes → 404 `{error, code:"not_found"}`. Responses are `cache-control: no-store`. Client `user_id` / schema / table / sql query params are ignored. Optional `healthExtras` lets the host attach a connection snapshot without forking health.

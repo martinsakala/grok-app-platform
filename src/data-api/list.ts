@@ -1,4 +1,5 @@
 import { UnauthorizedError } from "../auth/errors.js";
+import { asAuthUser } from "../auth/principal.js";
 import type { Database } from "../database/types.js";
 import { DataApiError, isDataApiError } from "./errors.js";
 import { qualifyApiRelation, quoteIdent } from "./identifiers.js";
@@ -7,10 +8,12 @@ import type { DataApiRegistry, ListResourceInput, ListResourceResult } from "./t
 import { DEFAULT_PAGE_SIZE, MAX_OFFSET, MAX_PAGE_SIZE } from "./types.js";
 
 function requireSessionUser(user: ListResourceInput["user"]) {
-  if (!user || typeof user.id !== "string" || user.id.trim() === "") {
+  if (!user) throw new UnauthorizedError();
+  const authUser = asAuthUser(user);
+  if (typeof authUser.id !== "string" || authUser.id.trim() === "") {
     throw new UnauthorizedError();
   }
-  return user;
+  return authUser;
 }
 
 function parsePositiveInt(value: unknown, fallback: number, max: number, min: number): number {

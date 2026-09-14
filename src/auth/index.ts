@@ -6,7 +6,29 @@ export type {
   AuthUser,
 } from "./types.js";
 
-export { UnauthorizedError, isUnauthorizedError } from "./errors.js";
+export {
+  UnauthorizedError,
+  isUnauthorizedError,
+  ForbiddenError,
+  isForbiddenError,
+  BadRequestError,
+  isBadRequestError,
+  MethodNotAllowedError,
+  isMethodNotAllowedError,
+} from "./errors.js";
+export type { ForbiddenCode } from "./errors.js";
+export { ROLES, isRole, parseRoles, type Role } from "./roles.js";
+export {
+  requirePrincipal,
+  requireRole,
+  hasRole,
+  ownerIdOf,
+  asAuthUser,
+  isPrincipal,
+  type Principal,
+  type UserPrincipal,
+  type ApiKeyPrincipal,
+} from "./principal.js";
 export {
   assignOwner,
   assertNoSecrets,

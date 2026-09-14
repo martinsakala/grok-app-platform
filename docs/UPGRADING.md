@@ -8,6 +8,43 @@
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+## 0.7.0
+
+`breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=true`, `appContractVersion=3`.
+
+Principals, roles, allowlist, API keys. Host catch-all from 0.6.0 is enough —
+new routes register inside the platform. **Subtree pull applies
+`0003_access.sql` on the next `runMigrations`.** Do not edit historical SQL.
+
+1. `git subtree pull --prefix=platform platform-upstream main --squash`.
+2. No new host files. Keep the 0.6.0 catch-all and aliases.
+3. After publish, the **first signed-in user becomes owner**. Later users
+   become `member` while the policy is `open` (the migration default).
+4. As that owner, switch the policy to allowlist — **do this as the first
+   step on every new app**:
+
+   ```bash
+   curl -sS -X PUT https://APP.grok.me/api/platform/admin/access-policy \
+     -H 'content-type: application/json' \
+     -H 'cookie: __Host-grok-auth.session_token=…' \
+     -d '{"mode":"allowlist","allowed_emails":["you@example.com"],"allowed_domains":[]}'
+   ```
+
+5. Optional: create the first API key (plaintext is returned once):
+
+   ```bash
+   curl -sS -X POST https://APP.grok.me/api/platform/api-keys \
+     -H 'content-type: application/json' \
+     -H 'cookie: __Host-grok-auth.session_token=…' \
+     -d '{"name":"ci","roles":["member"]}'
+   ```
+
+   Then `Authorization: Bearer gk_…` against `/api/platform/me` or
+   `/api/platform/data/:resource`. Rotate by revoke + create.
+
+See `docs/ACCESS.md`. Keep `setPgliteFactory` and the Nitro **closeBundle**
+PGlite copy; do **not** replace `nitro({ hooks.compiled })`.
+
 ## 0.6.0
 
 `breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=false`, `appContractVersion=3`.

@@ -61,8 +61,13 @@ export type AuthUser = {
 | `requireUser(source)` | `AuthUser`, or `UnauthorizedError` (401, message `"Unauthorized"`) |
 | `getCurrentSession(source)` | `{ user, expiresAt }` or `null` — **no session token** |
 | `ownerIdFromSession(user, client?)` | always `user.id`; ignores `client.user_id` |
-| `assignOwner(user, record)` | copies `record` but forces `user_id` from the session |
+| `assignOwner(user, record)` | copies `record` but forces `user_id` from the session (`AuthUser` or `Principal`) |
 | `getAuthDiagnostics()` | `{ schemaReady }` — no secrets, no current user |
+| `requirePrincipal(source, request?)` | `Principal` (user + roles, or API key); 401 without identity |
+
+`requireUser` is unchanged and still the session-only helper. Prefer
+`requirePrincipal` when a route should accept an API key as well. See
+`docs/ACCESS.md`.
 
 `requireUser` / `getCurrentUser` **do not take a user id argument**. A body
 like `{ "user_id": "abc" }` is never an authorization authority.
@@ -258,8 +263,8 @@ schema on the shared preview (or production) database.
    identity from platform `requireUser()`.
 8. Keep `user_id` columns `TEXT`. Never trust a client-supplied user id.
 
-## What 0.4.x does not include
+## What this module still does not include
 
-API keys, audit log, generic SQL/data API, metadata API, organizations/teams,
-RBAC beyond authenticated/unauthenticated, email/password, and business user
-profiles.
+Audit log, generic SQL, metadata API, organizations/teams, email/password,
+and business user profiles. Roles, allowlist, and API keys are in 0.7.0
+(`docs/ACCESS.md`). `requireUser` remains the session-only helper.

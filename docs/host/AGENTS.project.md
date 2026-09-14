@@ -69,7 +69,8 @@ TanStack `srcDirectory: "app"`, alias `@/*` → `/app/*`. Import Grok chrome fro
 - Mount platform HTTP at `app/routes/api/platform/$.ts`. Keep `/api/health`,
   `/api/version`, `/api/data/$resource` as aliases onto that handler.
 - Login UI is application-owned (`app/routes/login.tsx`), using Grok
-  `signIn("grok-google")` and `<UserButton />`.
+  `signIn("grok-google")` and `<UserButton />`. After the first sign-in,
+  switch `PUT /api/platform/admin/access-policy` to `allowlist`.
 
 ## Before reporting done
 

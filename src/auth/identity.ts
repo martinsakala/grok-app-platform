@@ -1,3 +1,4 @@
+import { ownerIdOf, type Principal } from "./principal.js";
 import type { AuthSession, AuthUser } from "./types.js";
 
 const AUTH_USER_KEYS = ["id", "email", "name", "image"] as const;
@@ -87,10 +88,10 @@ export function toAuthSession(raw: unknown): AuthSession | null {
  * Ownership always comes from the verified session user.
  */
 export function ownerIdFromSession(
-  user: AuthUser,
+  user: AuthUser | Principal,
   _clientPayload?: { user_id?: unknown } | null,
 ): string {
-  return user.id;
+  return ownerIdOf(user);
 }
 
 /**
@@ -98,11 +99,11 @@ export function ownerIdFromSession(
  * Any client-supplied `user_id` is discarded.
  */
 export function assignOwner<T extends Record<string, unknown>>(
-  user: AuthUser,
+  user: AuthUser | Principal,
   record: T,
 ): Omit<T, "user_id"> & { user_id: string } {
   const { user_id: _ignored, ...rest } = record;
-  return { ...rest, user_id: user.id };
+  return { ...rest, user_id: ownerIdOf(user) };
 }
 
 export function assertNoSecrets(payload: unknown, label = "auth payload"): void {

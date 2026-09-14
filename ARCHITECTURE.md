@@ -84,7 +84,7 @@
 
 21. Auth extension point (`src/auth`):
 
-    * Stable identity: `AuthUser`, `getCurrentUser(source)`, `requireUser(source)`, `getCurrentSession(source)`.
+    * Stable identity: `AuthUser`, `getCurrentUser(source)`, `requireUser(source)`, `getCurrentSession(source)`, plus 0.7.0 `Principal` / `requirePrincipal`.
     * The host binds `source` to Grok Better Auth (`auth.api.getSession`). The platform does not implement OAuth, does not ship `/api/auth/*`, and does not depend on `better-auth`.
     * `Client-provided user_id is never an authorization authority.`
     * Catch-all `app/routes/api/auth/$.ts` is a one-line adapter over Grok `auth.handler`. Login UI is application-owned.
@@ -100,13 +100,27 @@
 23. HTTP extension point (`src/http`):
 
     * `createPlatformHandler({ appConfig, sessionSource, dataApi, getDatabase, healthExtras })`.
-    * Internal registry of method + path. New capabilities add routes here, not in the host.
+    * Internal registry of method + path (GET/POST/PUT/DELETE). New capabilities add routes here, not in the host.
     * Prefix `/api/platform`. Host aliases keep `/api/health`, `/api/version`, `/api/data/:resource`.
+    * 0.7.0: `/me`, `/admin/users`, `/admin/access-policy`, `/api-keys`. Known path + wrong method is 405.
 
 24. Data API extension point (`src/data-api`):
 
     * Positive allowlist of named resources over schema `api` only. Schema `api` is not an automatic publish surface.
-    * Hosts call `defineDataApi` + `listResource`. Every resource requires `ownerColumn`; the server filters by the verified session user.
+    * Hosts call `defineDataApi` + `listResource`. Every resource requires `ownerColumn`; the server filters by `ownerIdOf(principal)` (session user or API-key owner).
     * `uniqueBy` (implicit `id` when `id` is returned) makes `ORDER BY` unique within one owner. It need not be in `columns`. The application owns that uniqueness; OFFSET is not a snapshot.
     * HTTP for list is `GET /api/platform/data/:resource` via `createPlatformHandler`. Hosts keep a thin catch-all; they do not reimplement list routing.
     * `public`, `private`, and `app` are never published. Auth denylist is defense-in-depth.
+
+25. Access extension point (`src/access`):
+
+    * First authenticated user becomes `owner` (serialized on `private.access_policy`). Later users become `member` if the allowlist allows them.
+    * Default policy mode is `open`. Switch new apps to `allowlist`. Owner always passes.
+    * `listUsers` / `setRoles` (admin+). Last owner cannot be removed. Admin cannot change an owner.
+
+26. API keys extension point (`src/api-keys`):
+
+    * `gk_` + 32 random bytes (base64url). SHA-256 hash stored; plaintext returned once.
+    * Lookup from `Authorization: Bearer gk_…` in `requirePrincipal`. Revoked keys are 401.
+    * Never log the key or hash. Data API rows belong to `ownerUserId`.
+

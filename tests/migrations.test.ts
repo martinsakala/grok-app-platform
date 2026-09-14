@@ -7,6 +7,7 @@ import {
   resetDatabaseForTests,
   runMigrations,
 } from "../src/database/index.js";
+import { PLATFORM_MIGRATIONS } from "../src/database/generated/platform-migrations.js";
 
 beforeEach(async () => {
   delete process.env.DATABASE_URL;
@@ -32,7 +33,9 @@ describe("platform migrations", () => {
     const history = await db.query<{ filename: string }>(
       "select filename from private.platform_migrations order by filename",
     );
-    expect(history.rows.map((row) => row.filename)).toEqual(["0001_init.sql", "0002_auth.sql"]);
+    expect(history.rows.map((row) => row.filename)).toEqual(
+      PLATFORM_MIGRATIONS.map((m) => m.filename),
+    );
 
     const diagnostics = await getDatabaseDiagnostics();
     expect(diagnostics).toEqual({
@@ -49,7 +52,7 @@ describe("platform migrations", () => {
     const history = await db.query<{ filename: string }>(
       "select filename from private.platform_migrations",
     );
-    expect(history.rows).toHaveLength(2);
+    expect(history.rows).toHaveLength(PLATFORM_MIGRATIONS.length);
   });
 
   it("fails when an applied migration checksum changes", async () => {

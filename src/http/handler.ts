@@ -1,10 +1,21 @@
-import { isUnauthorizedError, requireUser, type AuthSessionSource } from "../auth/index.js";
+import { getAccessPolicy, listUsers, setAccessPolicy, setRoles } from "../access/index.js";
+import { createApiKey, listApiKeys, revokeApiKey } from "../api-keys/index.js";
+import {
+  isBadRequestError,
+  isForbiddenError,
+  isMethodNotAllowedError,
+  isUnauthorizedError,
+  MethodNotAllowedError,
+  requirePrincipal,
+  type AuthSessionSource,
+} from "../auth/index.js";
 import { isDataApiError, listResource, type DataApiRegistry } from "../data-api/index.js";
 import type { Database } from "../database/types.js";
 import { createLogger, logError } from "../logging/index.js";
 import type { AppConfig } from "../runtime/types.js";
 import { getHealthResponse } from "../runtime/health.js";
 import { getVersionResponse } from "../runtime/version.js";
+import { readJsonBody } from "./json.js";
 
 const logger = createLogger("http");
 const PLATFORM_PREFIX = "/api/platform";
@@ -27,14 +38,19 @@ type RouteContext = {
   options: PlatformHandlerOptions;
 };
 
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+
 type Route = {
-  method: "GET";
+  method: HttpMethod;
   pattern: string;
   handler: (ctx: RouteContext) => Promise<Response>;
 };
 
-function json(body: unknown, status = 200): Response {
-  return Response.json(body, { status, headers: NO_STORE });
+function json(body: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
+  return Response.json(body, {
+    status,
+    headers: { ...NO_STORE, ...extraHeaders },
+  });
 }
 
 function notFound(): Response {
@@ -67,11 +83,24 @@ function mapError(error: unknown): Response {
   if (isUnauthorizedError(error) || (error instanceof Error && error.message === "Unauthorized")) {
     return json({ error: "Unauthorized" }, 401);
   }
+  if (isForbiddenError(error)) {
+    return json({ error: "Forbidden", code: error.code ?? "forbidden" }, 403);
+  }
+  if (isBadRequestError(error)) {
+    return json({ error: error.message, code: "bad_request" }, 400);
+  }
+  if (isMethodNotAllowedError(error)) {
+    return json({ error: "Method Not Allowed" }, 405, { allow: error.allow });
+  }
   if (isDataApiError(error)) {
     return json({ error: error.message, code: error.code }, error.status);
   }
   logError(logger, error, "request failed");
   return json({ error: "Internal Server Error" }, 500);
+}
+
+async function principalOf(ctx: RouteContext) {
+  return requirePrincipal(ctx.options.sessionSource(ctx.request), ctx.request);
 }
 
 async function healthRoute(ctx: RouteContext): Promise<Response> {
@@ -92,11 +121,11 @@ async function dataRoute(ctx: RouteContext): Promise<Response> {
   if (!ctx.options.dataApi || !ctx.options.getDatabase) {
     return notFound();
   }
-  const user = await requireUser(ctx.options.sessionSource(ctx.request));
+  const principal = await principalOf(ctx);
   const db = await ctx.options.getDatabase();
   const page = await listResource(ctx.options.dataApi, db, {
     resource: ctx.params.resource,
-    user,
+    user: principal,
     limit: ctx.url.searchParams.get("limit"),
     offset: ctx.url.searchParams.get("offset"),
     user_id: ctx.url.searchParams.get("user_id"),
@@ -107,11 +136,94 @@ async function dataRoute(ctx: RouteContext): Promise<Response> {
   return json(page);
 }
 
+async function meRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  if (principal.kind === "user") {
+    return json({
+      kind: "user",
+      user: { id: principal.user.id, email: principal.user.email, name: principal.user.name },
+      roles: principal.roles,
+    });
+  }
+  return json({
+    kind: "api-key",
+    keyId: principal.keyId,
+    keyName: principal.name,
+    roles: principal.roles,
+  });
+}
+
+async function adminUsersRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  const users = await listUsers(principal);
+  return json({ users });
+}
+
+async function adminSetRolesRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  const body = (await readJsonBody(ctx.request)) as { roles?: unknown };
+  const roles = await setRoles(principal, ctx.params.id, body.roles);
+  return json({ id: ctx.params.id, roles });
+}
+
+async function getPolicyRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  const policy = await getAccessPolicy(principal);
+  return json(policy);
+}
+
+async function putPolicyRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  const body = (await readJsonBody(ctx.request)) as Record<string, unknown>;
+  const policy = await setAccessPolicy(principal, body);
+  return json(policy);
+}
+
+async function listKeysRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  const keys = await listApiKeys(principal);
+  return json({ keys });
+}
+
+async function createKeyRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  const body = (await readJsonBody(ctx.request)) as Record<string, unknown>;
+  const created = await createApiKey(principal, body);
+  return json(created, 201);
+}
+
+async function revokeKeyRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  await revokeApiKey(principal, ctx.params.id);
+  return json({ revoked: true });
+}
+
 const routes: Route[] = [
   { method: "GET", pattern: "/health", handler: healthRoute },
   { method: "GET", pattern: "/version", handler: versionRoute },
   { method: "GET", pattern: "/data/:resource", handler: dataRoute },
+  { method: "GET", pattern: "/me", handler: meRoute },
+  { method: "GET", pattern: "/admin/users", handler: adminUsersRoute },
+  { method: "PUT", pattern: "/admin/users/:id/roles", handler: adminSetRolesRoute },
+  { method: "GET", pattern: "/admin/access-policy", handler: getPolicyRoute },
+  { method: "PUT", pattern: "/admin/access-policy", handler: putPolicyRoute },
+  { method: "GET", pattern: "/api-keys", handler: listKeysRoute },
+  { method: "POST", pattern: "/api-keys", handler: createKeyRoute },
+  { method: "DELETE", pattern: "/api-keys/:id", handler: revokeKeyRoute },
 ];
+
+function methodsForPath(rest: string): { methods: HttpMethod[]; params: RouteParams } | null {
+  const methods: HttpMethod[] = [];
+  let params: RouteParams = {};
+  for (const route of routes) {
+    const matched = matchPattern(route.pattern, rest);
+    if (matched) {
+      methods.push(route.method);
+      params = matched;
+    }
+  }
+  return methods.length ? { methods, params } : null;
+}
 
 function findRoute(method: string, rest: string): { route: Route; params: RouteParams } | null {
   for (const route of routes) {
@@ -139,34 +251,36 @@ export function createPlatformHandler(
       }
       const rest = pathname.slice(PLATFORM_PREFIX.length) || "/";
       const method = request.method.toUpperCase();
-      const matched = findRoute("GET", rest);
-      if (!matched) return notFound();
+      const pathMatch = methodsForPath(rest);
+      if (!pathMatch) return notFound();
 
+      const allow = [...new Set([...pathMatch.methods, "HEAD", "OPTIONS"])].join(", ");
       if (method === "OPTIONS") {
         return new Response(null, {
           status: 204,
-          headers: { ...NO_STORE, allow: "GET, HEAD, OPTIONS" },
+          headers: { ...NO_STORE, allow },
         });
       }
-      if (method === "HEAD") {
-        const response = await matched.route.handler({
-          request,
-          url,
-          params: matched.params,
-          options,
-        });
-        return new Response(null, { status: response.status, headers: response.headers });
-      }
-      if (method !== "GET") return notFound();
 
-      return await matched.route.handler({
+      const matched = findRoute(method === "HEAD" ? "GET" : method, rest);
+      if (!matched) {
+        throw new MethodNotAllowedError(allow);
+      }
+
+      const response = await matched.route.handler({
         request,
         url,
         params: matched.params,
         options,
       });
+      if (method === "HEAD") {
+        return new Response(null, { status: response.status, headers: response.headers });
+      }
+      return response;
     } catch (error) {
       return mapError(error);
     }
   };
 }
+
+

@@ -5,7 +5,8 @@ export type SqlParameter =
   | bigint
   | Date
   | null
-  | Uint8Array;
+  | Uint8Array
+  | readonly string[];
 
 export type QueryResult<T> = {
   rows: T[];

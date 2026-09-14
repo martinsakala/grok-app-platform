@@ -1,8 +1,9 @@
-# HTTP router (0.6.0)
+# HTTP router (0.6.0+)
 
 `createPlatformHandler` is the platform's HTTP surface. Hosts mount it once.
 New platform capabilities register routes here; they must not require a new
-host file per endpoint.
+host file per endpoint. 0.7.0 adds POST/PUT/DELETE and access routes; the
+host catch-all does not change.
 
 ## Prefix
 
@@ -14,10 +15,18 @@ the host rewrites those paths onto the same handler.
 | --- | --- | --- |
 | `GET` | `/api/platform/health` | public |
 | `GET` | `/api/platform/version` | public |
-| `GET` | `/api/platform/data/:resource` | `requireUser` |
-| `HEAD` / `OPTIONS` | same paths | public / same as GET |
+| `GET` | `/api/platform/data/:resource` | principal (session or `gk_` key) |
+| `GET` | `/api/platform/me` | principal |
+| `GET` | `/api/platform/admin/users` | admin+ |
+| `PUT` | `/api/platform/admin/users/:id/roles` | admin+ |
+| `GET` / `PUT` | `/api/platform/admin/access-policy` | owner |
+| `GET` / `POST` | `/api/platform/api-keys` | principal |
+| `DELETE` | `/api/platform/api-keys/:id` | owner of the key, or admin+ |
+| `HEAD` / `OPTIONS` | same paths | public / same as matching GET |
 
-Unknown method+path → `404 { "error": "Not Found", "code": "not_found" }`.
+Unknown **path** → `404 { "error": "Not Found", "code": "not_found" }`.
+Known path, wrong method → `405 { "error": "Method Not Allowed" }` with `Allow`.
+Invalid JSON or oversize body (32 KiB) → `400 { "error": "…", "code": "bad_request" }`.
 Every JSON response sends `cache-control: no-store`.
 
 ## Handler
@@ -50,13 +59,17 @@ not_found`.
 | Thrown | Status | Body |
 | --- | --- | --- |
 | `UnauthorizedError` | 401 | `{ "error": "Unauthorized" }` |
+| `ForbiddenError` | 403 | `{ "error": "Forbidden", "code": "forbidden" \| "not_allowed" }` |
+| `BadRequestError` | 400 | `{ "error": message, "code": "bad_request" }` |
+| `MethodNotAllowedError` | 405 | `{ "error": "Method Not Allowed" }` + `Allow` |
 | `DataApiError` | its `status` | `{ "error": message, "code": code }` |
 | anything else | 500 | `{ "error": "Internal Server Error" }` + `logError` |
 
 500 bodies never include SQL, driver text, or connection strings. Unknown
-resources are `DataApiError` `404 unknown_resource`.
+resources are `DataApiError` `404 unknown_resource`. Access routes: see
+`docs/ACCESS.md`.
 
 ## Host wiring
 
-One catch-all plus aliases — see `docs/UPGRADING.md` 0.6.0 and
+One catch-all plus aliases — see `docs/UPGRADING.md` 0.6.0 / 0.7.0 and
 `docs/HOST_LAYOUT.md`. Login UI and `/api/auth/$` stay application-owned.

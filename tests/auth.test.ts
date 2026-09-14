@@ -243,7 +243,7 @@ describe("auth migrations", () => {
     const history = await db.query<{ filename: string }>(
       "select filename from private.platform_migrations order by filename",
     );
-    expect(history.rows.map((row) => row.filename)).toEqual(["0001_init.sql", "0002_auth.sql"]);
+    expect(history.rows.map((row) => row.filename)).toEqual(["0001_init.sql", "0002_auth.sql", "0003_access.sql"]);
   });
 });
 

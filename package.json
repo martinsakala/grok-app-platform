@@ -9,7 +9,9 @@
     "./auth": "./src/auth/index.ts",
     "./data-api": "./src/data-api/index.ts",
     "./http": "./src/http/index.ts",
-    "./logging": "./src/logging/index.ts"
+    "./logging": "./src/logging/index.ts",
+    "./access": "./src/access/index.ts",
+    "./api-keys": "./src/api-keys/index.ts"
   },
   "scripts": {
     "generate:version": "node scripts/generate-platform-version.mjs",

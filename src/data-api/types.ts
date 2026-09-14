@@ -1,3 +1,4 @@
+import type { Principal } from "../auth/principal.js";
 import type { AuthUser } from "../auth/types.js";
 
 export const DEFAULT_PAGE_SIZE = 50;
@@ -46,7 +47,7 @@ export type DataApiRegistry = {
 
 export type ListResourceInput = {
   resource: unknown;
-  user: AuthUser | null | undefined;
+  user: AuthUser | Principal | null | undefined;
   limit?: unknown;
   offset?: unknown;
   /** Ignored. Client identity is never an authorization authority. */
