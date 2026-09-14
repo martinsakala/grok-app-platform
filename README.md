@@ -136,3 +136,7 @@ Releases: bump `VERSION`, regenerate (`npm run generate`), update
 `CHANGELOG.md`, `compatibility.json` and `docs/UPGRADING.md`, commit as
 `Release x.y.z: ...`. Hosts upgrade with
 `git subtree pull --prefix=platform platform-upstream main --squash`.
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).
