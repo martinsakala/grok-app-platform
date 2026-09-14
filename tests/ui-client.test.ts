@@ -123,4 +123,36 @@ describe("createPlatformClient", () => {
     const reset = await client.resetDesign();
     expect(reset.override).toBeNull();
   });
+
+  it("import/export/gallery design methods", async () => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/design/gallery")) {
+        return jsonResponse(200, {
+          presets: [{ id: "dark-neutral", name: "Dark neutral", tagline: "x", colors: { bg: "#0f1115" } }],
+        });
+      }
+      if (url.endsWith("/design/import") && init?.method === "POST") {
+        expect(init.body).toBe(JSON.stringify({ preset: "dark-neutral" }));
+        return jsonResponse(200, {
+          tokens: { "--pf-bg": "#0f1115" },
+          override: { source: "preset" },
+        });
+      }
+      if (url.endsWith("/design/export")) {
+        return new Response("# Brand\nname: App\n", {
+          status: 200,
+          headers: { "content-type": "text/markdown; charset=utf-8" },
+        });
+      }
+      return jsonResponse(500, { error: "Internal Server Error" });
+    });
+    const client = createPlatformClient({ fetch: fetchFn as unknown as typeof fetch });
+    const gallery = await client.listDesignGallery();
+    expect(gallery.presets[0]?.id).toBe("dark-neutral");
+    const imported = await client.importDesign({ preset: "dark-neutral" });
+    expect(imported.override?.source).toBe("preset");
+    const md = await client.exportDesign();
+    expect(md).toContain("# Brand");
+  });
 });

@@ -18,12 +18,17 @@ import { createLogger, logError } from "../logging/index.js";
 import type { AppConfig } from "../runtime/types.js";
 import { getHealthResponse } from "../runtime/health.js";
 import {
-  applyOverride,
   buildTimeTokens,
+  DESIGN_GALLERY,
+  parseDesignMd,
+  publicOverride,
+  tokensFromStored,
   validateDesignOverride,
-  type DesignOverride,
+  type DesignParseIssue,
   type DesignTokens,
+  type StoredDesign,
 } from "../design/index.js";
+import { DesignParseError } from "../design/types.js";
 import {
   deleteSetting,
   getSetting,
@@ -46,6 +51,8 @@ export type PlatformHandlerOptions = {
   healthExtras?: () => Promise<Record<string, unknown>> | Record<string, unknown>;
   /** Build-time `--pf-*` map from the host's generated design-tokens.css / design.md. */
   designTokens?: DesignTokens | (() => DesignTokens | Promise<DesignTokens>);
+  /** Raw repo-root design.md. When set, tokens are derived from it unless designTokens is also set. */
+  designMarkdown?: string | (() => string | Promise<string | null | undefined>);
 };
 
 type RouteParams = Record<string, string>;
@@ -259,15 +266,34 @@ async function listAuditRoute(ctx: RouteContext): Promise<Response> {
   return json(page);
 }
 
+async function resolveDesignMarkdown(options: PlatformHandlerOptions): Promise<string | null> {
+  const provided = options.designMarkdown;
+  if (typeof provided === "function") {
+    const value = await provided();
+    return typeof value === "string" && value.trim() ? value : null;
+  }
+  return typeof provided === "string" && provided.trim() ? provided : null;
+}
+
 async function resolveBuildTokens(options: PlatformHandlerOptions): Promise<DesignTokens> {
   const provided = options.designTokens;
   if (typeof provided === "function") {
     return buildTimeTokens(null, await provided());
   }
-  return buildTimeTokens(null, provided ?? null);
+  if (provided) return buildTimeTokens(null, provided);
+  const markdown = await resolveDesignMarkdown(options);
+  if (markdown) {
+    try {
+      return buildTimeTokens(parseDesignMd(markdown));
+    } catch (error) {
+      logError(logger, error, "design.md parse failed");
+      return buildTimeTokens(null, null);
+    }
+  }
+  return buildTimeTokens(null, null);
 }
 
-async function readDesignOverride(): Promise<DesignOverride | null> {
+async function readDesignOverride(): Promise<StoredDesign | null> {
   try {
     const value = await getSetting<unknown>("platform.design", null);
     if (value === null || value === undefined) return null;
@@ -281,11 +307,11 @@ async function readDesignOverride(): Promise<DesignOverride | null> {
 
 async function designPayload(options: PlatformHandlerOptions): Promise<{
   tokens: DesignTokens;
-  override: DesignOverride | null;
+  override: ReturnType<typeof publicOverride>;
 }> {
   const build = await resolveBuildTokens(options);
-  const override = await readDesignOverride();
-  return { tokens: applyOverride(build, override), override };
+  const stored = await readDesignOverride();
+  return { tokens: tokensFromStored(build, stored), override: publicOverride(stored) };
 }
 
 async function getDesignRoute(ctx: RouteContext): Promise<Response> {
@@ -297,13 +323,17 @@ async function putDesignRoute(ctx: RouteContext): Promise<Response> {
   const principal = await principalOf(ctx);
   requireRole(principal, "owner");
   const body = await readJsonBody(ctx.request);
-  const override = validateDesignOverride(body);
+  const rec = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
+  if (rec.source === undefined && rec.markdown === undefined && rec.spec === undefined) {
+    rec.source = "form";
+  }
+  const override = validateDesignOverride(rec);
   await setSetting(principal, "platform.design", override);
   await audit(principal, {
     action: "design.set",
     entity: "design",
     entityId: "platform.design",
-    meta: { keys: Object.keys(override) },
+    meta: { keys: Object.keys(override), source: override.source ?? "form" },
   });
   return json(await designPayload(ctx.options));
 }
@@ -325,9 +355,83 @@ async function deleteDesignRoute(ctx: RouteContext): Promise<Response> {
   return json(await designPayload(ctx.options));
 }
 
+function invalidDesign(errors: DesignParseIssue[], message = "Invalid design.md"): Response {
+  return json({ error: message, code: "invalid_design", errors }, 400);
+}
+
+async function importDesignRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  requireRole(principal, "owner");
+  const body = await readJsonBody(ctx.request);
+  const rec = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
+  let markdown: string;
+  let source: "markdown" | "preset";
+  let preset: string | undefined;
+  if (typeof rec.preset === "string" && rec.preset.trim()) {
+    const entry = DESIGN_GALLERY.find((item) => item.id === rec.preset);
+    if (!entry) {
+      return invalidDesign([{ line: 1, message: `unknown preset "${rec.preset}"` }], "Unknown preset");
+    }
+    markdown = entry.markdown;
+    source = "preset";
+    preset = entry.id;
+  } else if (typeof rec.markdown === "string") {
+    markdown = rec.markdown;
+    source = "markdown";
+  } else {
+    throw new BadRequestError("Expected markdown or preset");
+  }
+  let spec;
+  try {
+    spec = parseDesignMd(markdown);
+  } catch (error) {
+    if (error instanceof DesignParseError) {
+      return invalidDesign([{ line: error.line, message: error.message }]);
+    }
+    throw error;
+  }
+  const stored: StoredDesign = { markdown, spec, source, ...(preset ? { preset } : {}) };
+  await setSetting(principal, "platform.design", stored);
+  await audit(principal, {
+    action: "design.import",
+    entity: "design",
+    entityId: "platform.design",
+    meta: { source, ...(preset ? { preset } : {}) },
+  });
+  return json(await designPayload(ctx.options));
+}
+
+async function exportDesignRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  requireRole(principal, "owner");
+  const stored = await readDesignOverride();
+  const markdown = stored?.markdown || (await resolveDesignMarkdown(ctx.options));
+  if (!markdown) return notFound();
+  return new Response(markdown, {
+    status: 200,
+    headers: { ...NO_STORE, "content-type": "text/markdown; charset=utf-8" },
+  });
+}
+
+async function galleryDesignRoute(ctx: RouteContext): Promise<Response> {
+  const principal = await principalOf(ctx);
+  requireRole(principal, "owner");
+  return json({
+    presets: DESIGN_GALLERY.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      tagline: entry.tagline,
+      colors: entry.spec.colors,
+    })),
+  });
+}
+
 const routes: Route[] = [
   { method: "GET", pattern: "/health", handler: healthRoute },
   { method: "GET", pattern: "/version", handler: versionRoute },
+  { method: "GET", pattern: "/design/gallery", handler: galleryDesignRoute },
+  { method: "GET", pattern: "/design/export", handler: exportDesignRoute },
+  { method: "POST", pattern: "/design/import", handler: importDesignRoute },
   { method: "GET", pattern: "/design", handler: getDesignRoute },
   { method: "PUT", pattern: "/design", handler: putDesignRoute },
   { method: "DELETE", pattern: "/design", handler: deleteDesignRoute },

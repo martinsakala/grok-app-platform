@@ -6,6 +6,8 @@ import type {
   AuditPage,
   CreateApiKeyInput,
   CreatedApiKey,
+  DesignGalleryResponse,
+  DesignImportInput,
   DesignOverride,
   DesignResponse,
   HealthPayload,
@@ -46,6 +48,9 @@ export type PlatformClient = {
   getDesign: () => Promise<DesignResponse>;
   setDesign: (override: DesignOverride) => Promise<DesignResponse>;
   resetDesign: () => Promise<DesignResponse>;
+  importDesign: (input: DesignImportInput) => Promise<DesignResponse>;
+  exportDesign: () => Promise<string>;
+  listDesignGallery: () => Promise<DesignGalleryResponse>;
 };
 
 function trimBase(baseUrl: string): string {
@@ -158,5 +163,37 @@ export function createPlatformClient(options: PlatformClientOptions = {}): Platf
         body: JSON.stringify(override),
       }),
     resetDesign: () => request<DesignResponse>("/design", { method: "DELETE" }),
+    importDesign: (input) =>
+      request<DesignResponse>("/design/import", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    listDesignGallery: () => request<DesignGalleryResponse>("/design/gallery"),
+    exportDesign: async () => {
+      const headers = new Headers();
+      const bearer = await options.getBearer?.();
+      if (typeof bearer === "string" && bearer.trim()) {
+        headers.set("Authorization", `Bearer ${bearer.trim()}`);
+      }
+      let response: Response;
+      try {
+        response = await fetchFn(`${baseUrl}/design/export`, { headers });
+      } catch {
+        throw new PlatformClientError(0, "network", "Request failed");
+      }
+      const text = await response.text();
+      if (!response.ok) {
+        let body: unknown = null;
+        if (text) {
+          try {
+            body = JSON.parse(text);
+          } catch {
+            body = null;
+          }
+        }
+        throw mapResponseError(response.status, body);
+      }
+      return text;
+    },
   };
 }

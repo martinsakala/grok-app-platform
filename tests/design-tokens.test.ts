@@ -6,8 +6,10 @@ import {
   buildTimeTokens,
   generateTokensCss,
   parseDesignMd,
+  publicOverride,
   sanitizeTokens,
   tokensFromSpec,
+  tokensFromStored,
   tokensToCss,
   validateDesignOverride,
 } from "../src/design/index.js";
@@ -82,6 +84,32 @@ describe("runtime override", () => {
     expect(() => validateDesignOverride({ colors: { neon: "#ffffff" } })).toThrow(/unknown color/);
   });
 
+  it("accepts a {markdown, spec} document and keeps the 0.10 form overlay", () => {
+    const spec = parseDesignMd(VALID_DESIGN_MD);
+    const stored = validateDesignOverride({
+      markdown: VALID_DESIGN_MD,
+      spec,
+      source: "markdown",
+    });
+    expect(stored.spec?.brand.name).toBe("Example");
+    expect(stored.markdown).toContain("# Brand");
+    expect(stored.source).toBe("markdown");
+
+    const fromSpecOnly = validateDesignOverride({ spec });
+    expect(fromSpecOnly.spec?.colors.accent).toBe("#6ea8fe");
+    expect(fromSpecOnly.source).toBe("markdown");
+
+    const form = validateDesignOverride({ colors: { accent: "#ffffff" }, source: "form" });
+    expect(form.colors?.accent).toBe("#ffffff");
+    expect(form.spec).toBeUndefined();
+    expect(form.source).toBe("form");
+
+    expect(() => validateDesignOverride({ voice: { tone: "x" } })).toThrow(BadRequestError);
+    expect(() => validateDesignOverride({ markdown: VALID_DESIGN_MD, colors: { accent: "#fff" } })).toThrow(
+      /unknown design field/,
+    );
+  });
+
   it("applyOverride merges onto build-time tokens", () => {
     const base = buildTimeTokens(parseDesignMd(VALID_DESIGN_MD));
     const merged = applyOverride(base, { colors: { accent: "#abcdef" }, shape: { radiusMd: "2px" } });
@@ -90,5 +118,27 @@ describe("runtime override", () => {
     expect(merged["--pf-bg"]).toBe("#0f1115");
     expect(buildTimeTokens(null, { "--pf-bg": "#010101" })["--pf-bg"]).toBe("#010101");
     expect(buildTimeTokens()["--pf-accent"]).toBe(DEFAULT_TOKENS["--pf-accent"]);
+  });
+
+  it("tokensFromStored replaces from spec and publicOverride strips markdown/voice", () => {
+    const base = { "--pf-accent": "#000000", "--pf-bg": "#111111" };
+    const document = validateDesignOverride({ markdown: VALID_DESIGN_MD, source: "markdown" });
+    const fromDoc = tokensFromStored(base, document);
+    expect(fromDoc["--pf-accent"]).toBe("#6ea8fe");
+    expect(fromDoc["--pf-heading-font"]).toContain("Iowan");
+
+    const form = validateDesignOverride({ colors: { accent: "#abcdef" } });
+    const fromForm = tokensFromStored(base, form);
+    expect(fromForm["--pf-accent"]).toBe("#abcdef");
+    expect(fromForm["--pf-bg"]).toBe("#111111");
+
+    const published = publicOverride(document);
+    expect(published?.source).toBe("markdown");
+    expect(published?.typography?.headingFont).toContain("Iowan");
+    expect(published).not.toHaveProperty("markdown");
+    expect(published).not.toHaveProperty("spec");
+    expect(JSON.stringify(published)).not.toContain("# Brand");
+    expect(JSON.stringify(published)).not.toContain("calm and direct");
+    expect(publicOverride(null)).toBeNull();
   });
 });

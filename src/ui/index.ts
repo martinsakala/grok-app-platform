@@ -20,4 +20,7 @@ export type {
   DesignResponse,
   DesignOverride,
   DesignTokens,
+  DesignGalleryPreset,
+  DesignGalleryResponse,
+  DesignImportInput,
 } from "./types.js";

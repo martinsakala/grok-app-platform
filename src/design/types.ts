@@ -44,14 +44,32 @@ export type DesignSpec = {
   voice: VoiceSpec;
 };
 
+export type DesignSource = "markdown" | "preset" | "form";
+
 /** Runtime/JSON subset that may override build-time tokens. Voice never applies to CSS. */
 export type DesignOverride = {
   colors?: Partial<ColorTokens>;
   typography?: Partial<TypographySpec>;
   shape?: Partial<ShapeSpec>;
+  source?: DesignSource | null;
+};
+
+/**
+ * Stored `platform.design` document: either the 0.10 form overlay or a
+ * 0.11 `{ markdown, spec }` document (Voice included in spec, never in CSS).
+ */
+export type StoredDesign = DesignOverride & {
+  markdown?: string;
+  spec?: DesignSpec;
+  preset?: string;
 };
 
 export type DesignTokens = Record<string, string>;
+
+export type DesignParseIssue = {
+  line: number;
+  message: string;
+};
 
 export class DesignParseError extends Error {
   readonly line: number;

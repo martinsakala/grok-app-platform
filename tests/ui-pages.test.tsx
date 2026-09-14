@@ -40,6 +40,9 @@ function unusedClient(): PlatformClient {
     getDesign: fail,
     setDesign: fail,
     resetDesign: fail,
+    importDesign: fail,
+    exportDesign: fail,
+    listDesignGallery: fail,
   };
 }
 
@@ -322,6 +325,11 @@ describe("platform UI pages", () => {
     expect(data).toContain("platform.design");
     expect(data).toContain("Reset");
     expect(data).toContain("Save");
+    expect(data).toContain("Import");
+    expect(data).toContain("Gallery");
+    expect(data).toContain("Fine-tune");
+    expect(data).toContain("Copy prompt for an LLM");
+    expect(data).toContain("Download design.md");
     expect(data).toContain(DEFAULT_TOKENS["--pf-accent"]);
   });
 

@@ -1,6 +1,6 @@
 {
-  "platformVersion": "0.10.0",
-  "appContractVersion": 5,
+  "platformVersion": "0.11.0",
+  "appContractVersion": 6,
   "breaking": false,
   "requiresAppChanges": true,
   "requiresDatabaseMigration": false

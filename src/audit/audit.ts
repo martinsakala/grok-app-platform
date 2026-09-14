@@ -14,7 +14,8 @@ export type AuditAction =
   | "api_key.revoke"
   | "settings.set"
   | "settings.delete"
-  | "design.set";
+  | "design.set"
+  | "design.import";
 
 export type AuditInput = {
   action: string;
