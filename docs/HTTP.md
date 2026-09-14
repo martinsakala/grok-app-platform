@@ -2,8 +2,11 @@
 
 `createPlatformHandler` is the platform's HTTP surface. Hosts mount it once.
 New platform capabilities register routes here; they must not require a new
-host file per endpoint. 0.7.0 adds POST/PUT/DELETE and access routes; the
-host catch-all does not change. 0.8.0 adds settings and the admin audit log.
+host file per endpoint. 0.7.0 adds POST/PUT/DELETE and access routes. 0.8.0 adds settings and the
+admin audit log. **The host catch-all must list PUT and DELETE** — TanStack
+Start does not forward unlisted methods, so `requiresAppChanges=false` in
+0.7.0/0.8.0 was incorrect on that point. 0.9.0 adds a UI client over these
+routes; it does not add HTTP routes.
 
 ## Prefix
 
@@ -73,5 +76,7 @@ resources are `DataApiError` `404 unknown_resource`. Access routes: see `docs/AC
 
 ## Host wiring
 
-One catch-all plus aliases — see `docs/UPGRADING.md` 0.6.0 / 0.7.0 and
-`docs/HOST_LAYOUT.md`. Login UI and `/api/auth/$` stay application-owned.
+One catch-all plus aliases — see `docs/UPGRADING.md` 0.6.0 / 0.7.0 / 0.9.0 and
+`docs/HOST_LAYOUT.md`. The catch-all must forward GET, POST, PUT, DELETE,
+OPTIONS, and HEAD. Login UI and `/api/auth/$` stay application-owned. Admin
+pages: `docs/UI.md`.

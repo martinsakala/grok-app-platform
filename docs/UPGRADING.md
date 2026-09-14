@@ -9,17 +9,51 @@
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
 
+## 0.9.0
+
+`breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=false`, `appContractVersion=4`.
+
+Platform UI zone: typed client + admin pages. **Subtree pull is not enough** —
+the host must mount routes and Tailwind `@source`. No new SQL. Do not edit
+historical migrations.
+
+1. `git subtree pull --prefix=platform platform-upstream main --squash`.
+2. Catch-all `app/routes/api/platform/$.ts` must forward **GET, POST, PUT,
+   DELETE, OPTIONS, HEAD** to `handlePlatformRequest`. TanStack Start only
+   dispatches methods listed on the route; PUT/DELETE otherwise never reach
+   the platform (this was already required for 0.7.0 keys/roles and 0.8.0
+   settings — see the correction below).
+3. `app/styles.css`: import `../platform/src/ui/tokens.css` and add
+   `@source "../platform/src/ui";` so Tailwind v4 emits platform classes.
+4. Add a thin client (`createPlatformClient({ baseUrl: "/api/platform" })`)
+   and route files that mount `StatusPage`, `UsersPage`, `AccessPolicyPage`,
+   `ApiKeysPage`, `SettingsPage`, `AuditPage` inside `AppShell` /
+   `AdminLayout`. Pass `client`. Keep Grok `UserButton` in `userSlot`.
+   Login stays application-owned. See `docs/UI.md` for the file list.
+5. Replace any host diagnostic that compared `platformVersion` to a
+   hardcoded string. `StatusPage` uses `PLATFORM_VERSION`.
+6. Keep `setPgliteFactory` and the Nitro **closeBundle** PGlite copy; do
+   **not** replace `nitro({ hooks.compiled })`.
+
+After upgrade, unsigned preview: `/api/platform/version` `0.9.0`,
+`/api/platform/me` 401, `/api/platform/settings` 401. Signed-in owner:
+Status page shows matching platform version; Users / Access policy /
+API keys / Settings / Audit render without a host-side fetch.
+
 ## 0.8.0
 
 `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=true`, `appContractVersion=3`.
 
-Settings and an append-only audit log. Host catch-all from 0.6.0 is enough —
-new routes register inside the platform. **Subtree pull applies
-`0004_settings_audit.sql` on the next `runMigrations`.** Do not edit historical
-SQL. No retention: `private.audit_log` grows until you archive it.
+Settings and an append-only audit log. New routes register inside the
+platform. **Correction:** `requiresAppChanges=false` was wrong about the
+catch-all. TanStack Start only handles methods listed on the route file —
+**forward PUT and DELETE** (needed for settings writes). **Subtree pull
+applies `0004_settings_audit.sql` on the next `runMigrations`.** Do not edit
+historical SQL. No retention: `private.audit_log` grows until you archive it.
 
 1. `git subtree pull --prefix=platform platform-upstream main --squash`.
-2. No new host files. Keep the 0.6.0 catch-all and aliases.
+2. No new host files beyond the catch-all. **Forward PUT and DELETE** (see the
+   correction above), then keep aliases.
 3. After publish, the first request runs `0004`. Then, as owner:
 
    ```bash
@@ -72,12 +106,16 @@ See `docs/ACCESS.md`.
 
 `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=true`, `appContractVersion=3`.
 
-Principals, roles, allowlist, API keys. Host catch-all from 0.6.0 is enough —
-new routes register inside the platform. **Subtree pull applies
-`0003_access.sql` on the next `runMigrations`.** Do not edit historical SQL.
+Principals, roles, allowlist, API keys. New routes register inside the
+platform. **Correction:** `requiresAppChanges=false` omitted a host catch-all
+change. The 0.6.0 file listed GET/POST/OPTIONS; **PUT and DELETE must be
+forwarded** or role updates, access-policy writes, and API-key revoke never
+hit the router. **Subtree pull applies `0003_access.sql` on the next
+`runMigrations`.** Do not edit historical SQL.
 
 1. `git subtree pull --prefix=platform platform-upstream main --squash`.
-2. No new host files. Keep the 0.6.0 catch-all and aliases.
+2. No new host files beyond the catch-all. **Forward PUT and DELETE** (see the
+   correction above), then keep aliases.
 3. After publish, the **first signed-in user becomes owner**. Later users
    become `member` while the policy is `open` (the migration default).
 4. As that owner, switch the policy to allowlist — **do this as the first
@@ -114,8 +152,9 @@ catch-all. Auth, data-API registry, query traffic, and migrations are unchanged.
 No historical SQL edits.
 
 1. `git subtree pull --prefix=platform platform-upstream main --squash`.
-2. Add `app/routes/api/platform/$.ts` that forwards `GET`/`POST`/`OPTIONS` (and
-   `HEAD` if the host lists it) to `createPlatformHandler`. Bind
+2. Add `app/routes/api/platform/$.ts` that forwards `GET`/`POST`/`PUT`/`DELETE`/
+   `OPTIONS`/`HEAD` to `createPlatformHandler`. (0.6.0 originally listed only
+   GET/POST/OPTIONS; PUT/DELETE are required from 0.7.0.) Bind
    `sessionSource: (request) => …` from `app/auth.server.ts` so the request's
    `Authorization` header and cookies reach Better Auth. Pass `appConfig`,
    `dataApi`, `getDatabase`, and optional `healthExtras`.

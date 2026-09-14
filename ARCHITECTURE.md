@@ -136,3 +136,11 @@
     * Automatic rows for owner bootstrap, auto-member, role/policy/API-key/settings changes.
     * `GET /api/platform/admin/audit` is admin+, cursor by `id` desc. No retention in 0.8.0.
 
+29. UI extension point (`src/ui`):
+
+    * Fourth zone: the platform owns reusable pages and shells; the host only mounts them.
+    * `createPlatformClient` is the only fetch wrapper pages use.
+    * Hosts pass `href` / `onNavigate` / `userSlot`. The platform does not import a router.
+    * Tokens live in `src/ui/tokens.css` (`--pf-*`). Tailwind v4 hosts must `@source` this directory.
+    * `appContractVersion` 4. Login UI remains application-owned.
+

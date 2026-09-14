@@ -74,6 +74,9 @@ TanStack `srcDirectory: "app"`, alias `@/*` → `/app/*`. Import Grok chrome fro
 - App JSON config goes through `/api/platform/settings` (member reads, admin writes,
   `platform.*` owner-only). Admin audit is `GET /api/platform/admin/audit`. Do not
   store secrets in settings; there is no audit retention job.
+- Mount platform admin UI (`AppShell` / `StatusPage` / `/admin/*` pages) instead of
+  hand-rolled diagnostics. Import `tokens.css` and Tailwind `@source` `platform/src/ui`.
+  Catch-all must forward PUT and DELETE.
 
 ## Before reporting done
 

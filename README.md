@@ -16,7 +16,7 @@ There are exactly three things, and they are not copies of each other:
 
 | Thing | Where | What it is | Can you run it? |
 | --- | --- | --- | --- |
-| **Platform** (this repo) | GitHub `grok-app-platform`, public | A **library**: identity, database, migrations, read-only data API. No pages, no login screen, no app. | No |
+| **Platform** (this repo) | GitHub `grok-app-platform`, public | A **library**: identity, database, migrations, data API, and admin UI components the host mounts. No login screen, no runnable app. | No |
 | **mother-app** | GitHub `mother-app`, private | The **source code of one application** that uses the library. Contains a copy of the library under `/platform`, plus pages, login, config and Grok's own scaffold. | Yes |
 | **mother-app, published** | Grok Build project → `mother-app.grok.me` | The **running** mother-app, built from that source. Other apps start as a **Remix** of it. | It is running |
 
@@ -68,10 +68,12 @@ domain layer on top of an unchanged, upgradable platform.
 | `api-keys` | `platform/src/api-keys` | hashed `gk_` keys; plaintext once; data scoped to the key owner |
 | `settings` | `platform/src/settings` | JSON documents in `private.settings`; `platform.*` owner-only writes |
 | `audit` | `platform/src/audit` | append-only `private.audit_log`; admin cursor list; no retention job |
+| `ui` | `platform/src/ui` | typed `createPlatformClient`, AppShell / AdminLayout, admin pages, `--pf-*` tokens. Host mounts; no router in the platform |
 
-Everything is server-only. Login UI stays in the application. HTTP under
+Server APIs stay server-only. Login UI stays in the application. HTTP under
 `/api/platform` is served by `createPlatformHandler`; hosts mount one catch-all
-plus aliases for `/api/health`, `/api/version`, `/api/data/:resource`.
+(GET/POST/PUT/DELETE/OPTIONS/HEAD) plus aliases. 0.9.0 adds a **UI zone**:
+the platform owns admin pages; the host only mounts them (see `docs/UI.md`).
 
 ## How it works
 

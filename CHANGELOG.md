@@ -1,9 +1,17 @@
 # Changelog
 
+## 0.9.0
+- **UI zone** (`src/ui`): `AppShell`, `AdminLayout`, `StatusPage`, `UsersPage`, `AccessPolicyPage`, `ApiKeysPage`, `SettingsPage`, `AuditPage`. Tailwind classes + `--pf-*` tokens (`tokens.css`). Pages take a `client` prop; no router import; loading/empty/error/403 on every page. `StatusPage` compares against `PLATFORM_VERSION`, never a hardcoded string.
+- **Platform client**: `createPlatformClient({ baseUrl, getBearer? })` covers all existing `/api/platform` routes. Errors are `PlatformClientError { status, code, message }` with no secrets. API-key plaintext is success-only.
+- Host: `requiresAppChanges=true` (mount routes, `@source` platform UI, import tokens). `breaking=false`, `requiresDatabaseMigration=false`, `appContractVersion=4`. React 19 is a peer (host already has it); this repo adds it as a devDependency for typecheck/tests.
+- **Docs correction:** 0.7.0 / 0.8.0 `requiresAppChanges=false` was wrong about the catch-all. TanStack Start only dispatches listed methods — forward **PUT and DELETE**.
+- No historical migration edits. No 0.10 design.md yet.
+
+
 ## 0.8.0
 - **Settings** (`src/settings`, migration `0004_settings_audit.sql`): `private.settings` JSON documents. Key `^[a-z][a-z0-9_.-]{0,99}$`. `platform.*` write = owner; other writes = admin+; read = member+. Value ≤ 64 KiB. `getSetting` / `setSetting` / `deleteSetting` / `listSettings`. HTTP `GET/PUT/DELETE /api/platform/settings/:key` and `GET /settings`.
 - **Audit log** (`src/audit`): `private.audit_log` append-only. `audit(principal, {action, entity, entityId?, meta?})` redacts meta (no secrets, keys, hashes); write failure is logged, not thrown. Auto-logged: owner bootstrap, auto-member, role change, access policy, API key create/revoke, settings set/delete. `GET /api/platform/admin/audit` (admin+, cursor by `id` desc, `limit` ≤ 100). No retention job.
-- Host catch-all unchanged (`requiresAppChanges=false`). `breaking=false`, `requiresDatabaseMigration=true`, `appContractVersion` remains 3. No historical migration edits.
+- Host catch-all: `requiresAppChanges=false` was incorrect — PUT/DELETE must be listed (corrected in 0.9.0 docs). `breaking=false`, `requiresDatabaseMigration=true`, `appContractVersion` remains 3. No historical migration edits.
 
 
 ## 0.7.1
@@ -15,7 +23,7 @@
 - **Principal** (`src/auth`): `requirePrincipal` is a signed-in user or an API key (`gk_…`). `Role` is `owner` ⊇ `admin` ⊇ `member`. `requireRole` / `hasRole`. `requireUser` stays. `assignOwner` / `ownerIdFromSession` / data-API list accept `Principal` or `AuthUser`. Client `user_id` is still never identity.
 - **Access** (`src/access`, migration `0003_access.sql`): first authenticated user becomes `owner` (serialized on `private.access_policy`). Later users become `member` if the allowlist allows them. Default mode is `open`; switch new apps to `allowlist`. Owner always passes. `listUsers` / `setRoles` (admin+; last owner cannot be dropped; admin cannot change an owner). `getAccessPolicy` / `setAccessPolicy` (owner).
 - **API keys** (`src/api-keys`): `gk_` + 32 random bytes (base64url), SHA-256 hash stored, plaintext returned once. Roles cannot exceed the creator. Data API scoped to `ownerUserId`. Revoke → 401. Key and hash are never logged.
-- **HTTP**: POST/PUT/DELETE, JSON body limit, 405 for known path + wrong method, 400 invalid JSON. New routes: `/me`, `/admin/users`, `/admin/users/:id/roles`, `/admin/access-policy`, `/api-keys`. `/data/:resource` uses `requirePrincipal`. Host catch-all unchanged (`requiresAppChanges=false`).
+- **HTTP**: POST/PUT/DELETE, JSON body limit, 405 for known path + wrong method, 400 invalid JSON. New routes: `/me`, `/admin/users`, `/admin/users/:id/roles`, `/admin/access-policy`, `/api-keys`. `/data/:resource` uses `requirePrincipal`. Host catch-all must list PUT/DELETE (`requiresAppChanges=false` was incorrect; see 0.9.0).
 - `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=true`, `appContractVersion` remains 3. No historical migration edits.
 
 ## 0.6.0
