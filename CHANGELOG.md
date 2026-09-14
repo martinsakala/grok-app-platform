@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.0
+- **Mutations** (`src/mutations`): `defineMutations` registers named writes (`kebab-case`, description, input schema, roles, handler). Built-in JSON validator (string/number/boolean/integer/array/object, required, enum, min/max/maxLength, items, properties). Unknown keys rejected. Handler `ctx = { principal, db, input, logger, request: { id } }` runs in a transaction; `ctx.db` is that transaction. `MutationError("conflict")` → 409. Owner scoping is the handler's job (`mutationOwnerId` + `WHERE user_id = …`). Client `user_id` is never identity.
+- **HTTP:** `GET /mutations` (principal, filtered by role), `POST /mutations/:name` (session or API key). `200 { ok, result }`. `400 invalid_input` with `{ path, message }[]`, `401`, `403`, `404 unknown_mutation`, `409 conflict` / `idempotency_mismatch`, `500 mutation_failed` (details in the logger only). Optional `Idempotency-Key` (24 h, `private.idempotency_keys`, lazy delete).
+- **Audit:** `mutation.<name>` with `{ outcome, inputSha256, requestId }` — never the payload.
+- **UI:** `MutationsPage` (member+), client `listMutations` / `runMutation`.
+- Host: `requiresAppChanges=true` (`app/mutations.ts`, pass `mutations`, mount the page). `breaking=false`, `requiresDatabaseMigration=true` (private only, `0005_idempotency.sql`), `appContractVersion=7`. No historical migration edits.
+
 ## 0.12.0
 - **Data API keyset cursor.** `listResource` accepts `cursor` next to `limit`. When `cursor` is set, `offset` is ignored and the response `offset` is `0`. Response is `{ items, limit, nextCursor, offset }` — `nextCursor` is `null` when `items.length < limit`. Additive: old clients keep using `offset`.
 - Cursor is opaque `base64url(JSON { v:1, r, o, u }).HMAC-SHA256`. Key is derived from `DATABASE_URL` (or a random per-process key when unset). Valid only for the same resource on the same deployment. Malformed / unsigned / foreign-resource / other-deployment tokens are `400 invalid_cursor`, never `500`. The key and its derivation are never logged. Dates serialize as ISO, bigints as strings; comparison values are query parameters (identifiers only from the registry). `uniqueBy` is loaded internally and omitted from `items` unless listed in `columns`.

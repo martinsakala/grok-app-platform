@@ -30,7 +30,7 @@ Typed methods cover every 0.8.0 route plus 0.10.0/0.11.0 design: `me`, `health`,
 `getSetting` / `setSetting` / `deleteSetting`, `listAudit`,
 `listData(resource, { limit, offset, cursor })`,
 `getDesign` / `setDesign` / `resetDesign` / `importDesign` / `exportDesign` /
-`listDesignGallery`.
+`listDesignGallery`, `listMutations` / `runMutation(name, input, { idempotencyKey })`.
 
 Failures become `PlatformClientError { status, code, message }`. Only the
 JSON fields `error` and `code` are copied. Tokens, hashes, and `gk_` keys
@@ -52,6 +52,7 @@ Pages take a `client` prop. They must not call `fetch` themselves.
 | `SettingsPage` | Member read; admin write; `platform.*` owner |
 | `AuditPage` | Admin+: `before=id` pagination and action/entity filters |
 | `DesignPage` | Owner: Import (paste/upload/Validate/Apply), Gallery (Use), Export (Download `design.md` + copy LLM prompt), Fine-tune, Reset |
+| `MutationsPage` | Member+: list of mutations the caller can run, schema form, Run, result or field errors |
 
 Every page has loading / empty / error / 403 states. Optional `preview` is
 for tests (`renderToString`); hosts omit it.

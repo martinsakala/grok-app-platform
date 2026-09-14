@@ -10,7 +10,8 @@ routes; it does not add HTTP routes. 0.10.0 adds public `GET /design` and
 owner `PUT`/`DELETE /design`. 0.11.0 adds owner `POST /design/import`,
 `GET /design/export`, `GET /design/gallery`, and optional handler
 `designMarkdown`. 0.12.0 adds `?cursor=` on `GET /data/:resource` (signed
-keyset; `invalid_cursor` is 400).
+keyset; `invalid_cursor` is 400). 0.13.0 adds `GET /mutations` and
+`POST /mutations/:name` (optional handler `mutations`).
 
 ## Prefix
 
@@ -37,6 +38,8 @@ the host rewrites those paths onto the same handler.
 | `POST` | `/api/platform/design/import` | owner. Body `{ markdown }` or `{ preset }` |
 | `GET` | `/api/platform/design/export` | owner. `text/markdown` |
 | `GET` | `/api/platform/design/gallery` | owner |
+| `GET` | `/api/platform/mutations` | principal. Mutations the caller can run |
+| `POST` | `/api/platform/mutations/:name` | principal + mutation roles. Body = input; optional `Idempotency-Key` |
 | `HEAD` / `OPTIONS` | same paths | public / same as matching GET |
 
 Unknown **path** → `404 { "error": "Not Found", "code": "not_found" }`.
@@ -57,6 +60,7 @@ export const handlePlatform = createPlatformHandler({
   healthExtras: async () => ({ /* host connection snapshot */ }),
   designTokens,   // optional explicit --pf-* map; wins over designMarkdown
   designMarkdown, // optional raw design.md; tokens derived when designTokens omitted
+  mutations,      // optional defineMutations({ mutations }); omit → /mutations is 404
 });
 ```
 
@@ -81,12 +85,17 @@ not_found`.
 | `ForbiddenError` | 403 | `{ "error": "Forbidden", "code": "forbidden" \| "not_allowed" }` |
 | `BadRequestError` | 400 | `{ "error": message, "code": "bad_request" }` |
 | import `DesignParseError` | 400 | `{ "error": message, "code": "invalid_design", "errors": [{ "line", "message" }] }` |
+| `MutationInputError` | 400 | `{ "error": message, "code": "invalid_input", "errors": [{ "path", "message" }] }` |
+| `UnknownMutationError` | 404 | `{ "error": "Mutation is not available", "code": "unknown_mutation" }` |
+| `MutationError("conflict")` | 409 | `{ "error": "Conflict", "code": "conflict" }` |
+| idempotency mismatch | 409 | `{ "error": "…", "code": "idempotency_mismatch" }` |
+| `MutationFailedError` | 500 | `{ "error": "Mutation failed", "code": "mutation_failed" }` |
 | `MethodNotAllowedError` | 405 | `{ "error": "Method Not Allowed" }` + `Allow` |
 | `DataApiError` | its `status` | `{ "error": message, "code": code }` |
 | anything else | 500 | `{ "error": "Internal Server Error" }` + `logError` |
 
 500 bodies never include SQL, driver text, or connection strings. Unknown
-resources are `DataApiError` `404 unknown_resource`. Access routes: see `docs/ACCESS.md`. Settings: `docs/SETTINGS.md`. Audit: `docs/AUDIT.md`. Design: `docs/DESIGN.md`.
+resources are `DataApiError` `404 unknown_resource`. Access routes: see `docs/ACCESS.md`. Settings: `docs/SETTINGS.md`. Audit: `docs/AUDIT.md`. Design: `docs/DESIGN.md`. Mutations: `docs/MUTATIONS.md`.
 
 ## Host wiring
 

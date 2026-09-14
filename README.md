@@ -70,6 +70,7 @@ domain layer on top of an unchanged, upgradable platform.
 | `audit` | `platform/src/audit` | append-only `private.audit_log`; admin cursor list; no retention job |
 | `ui` | `platform/src/ui` | typed `createPlatformClient`, AppShell / AdminLayout, admin pages (incl. Design), `--pf-*` tokens. Host mounts; no router in the platform |
 | `design` | `platform/src/design` | `design.md` parser, `--pf-*` CSS generator, runtime document/form overlay, gallery presets, `DESIGN_PROMPT`. Voice never becomes CSS |
+| `mutations` | `platform/src/mutations` | `defineMutations` + `POST /mutations/:name`: transactional host writes, same contract for GUI and API keys |
 
 Server APIs stay server-only. Login UI stays in the application. HTTP under
 `/api/platform` is served by `createPlatformHandler`; hosts mount one catch-all
@@ -81,6 +82,8 @@ can paste, upload, or pick a preset in `/admin/design` and apply it immediately;
 commit the downloaded `design.md` to the repo root (the coding agent reads the
 file, not the database). 0.12.0 adds **keyset `cursor` pagination** on
 `GET /api/platform/data/:resource` (`nextCursor`; old `offset` still works).
+0.13.0 adds **mutations**: host-registered writes with audit and optional
+idempotency, callable from `MutationsPage` or an API key.
 Hosts that landed `/platform` as a snapshot (no subtree
 metadata) copy the upstream tree instead of `git subtree pull` — `docs/UPGRADING.md`.
 
@@ -129,14 +132,14 @@ anything added to mother-app later. The only update channel is this library:
 - Rules for coding agents working in a host repository: [`docs/host/AGENTS.project.md`](docs/host/AGENTS.project.md)
 - Upgrading an existing application: [`docs/UPGRADING.md`](docs/UPGRADING.md) and [`compatibility.json`](compatibility.json)
 - Architecture and invariants: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`AGENTS.md`](AGENTS.md)
-- Module contracts: [`docs/AUTH.md`](docs/AUTH.md), [`docs/ACCESS.md`](docs/ACCESS.md), [`docs/DATABASE.md`](docs/DATABASE.md), [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md), [`docs/DATA_API.md`](docs/DATA_API.md), [`docs/HTTP.md`](docs/HTTP.md), [`docs/LOGGING.md`](docs/LOGGING.md), [`docs/HOST_LAYOUT.md`](docs/HOST_LAYOUT.md), [`docs/UI.md`](docs/UI.md), [`docs/DESIGN.md`](docs/DESIGN.md)
+- Module contracts: [`docs/AUTH.md`](docs/AUTH.md), [`docs/ACCESS.md`](docs/ACCESS.md), [`docs/DATABASE.md`](docs/DATABASE.md), [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md), [`docs/DATA_API.md`](docs/DATA_API.md), [`docs/HTTP.md`](docs/HTTP.md), [`docs/LOGGING.md`](docs/LOGGING.md), [`docs/HOST_LAYOUT.md`](docs/HOST_LAYOUT.md), [`docs/UI.md`](docs/UI.md), [`docs/DESIGN.md`](docs/DESIGN.md), [`docs/MUTATIONS.md`](docs/MUTATIONS.md)
 
 ## What it does not do (yet)
 
-Writes through a generic API, organizations and teams, email/password
-sign-in. Applications own their writes through server functions guarded by
-`requireUser` / `requirePrincipal`. See `CHANGELOG.md` for what each version
-added.
+Organizations and teams, email/password sign-in. Applications own domain
+writes either as `defineMutations` handlers or as server functions guarded
+by `requireUser` / `requirePrincipal`. See `CHANGELOG.md` for what each
+version added.
 
 ## Development
 

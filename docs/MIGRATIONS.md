@@ -10,6 +10,8 @@
 
 Do **not** share one integer sequence across the three kinds. Each kind is ordered by **filename** (`0001_…sql`, `0002_…sql`, …).
 
+Platform `0005_idempotency.sql` (0.13.0) creates `private.idempotency_keys` for mutation `Idempotency-Key` replay. Do not edit it after release. Expired rows are deleted lazily on the next mutation write; there is no cleanup job.
+
 Platform `0002_auth.sql` is a **historical 0.4.0 compatibility bootstrap** (`IF NOT EXISTS` of Better Auth tables in `public`). It must not be edited. Canonical Better Auth DDL is Grok `migrations/auth/0001_auth.sql`. Do not add later platform migrations that copy new Better Auth internal columns.
 
 ## Transaction semantics

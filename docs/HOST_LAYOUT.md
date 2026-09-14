@@ -51,6 +51,7 @@ app/migrations-api/*.sql
 app/db.server.ts              # setPgliteFactory + runMigrations + getDatabase
 app/auth.server.ts            # binds Grok session → platform requireUser/getCurrentUser
 app/data-api.ts               # optional 0.5.0 defineDataApi registry (application-owned)
+app/mutations.ts              # 0.13.0 defineMutations registry (application-owned)
 app/routes/api/platform/$.ts  # 0.6.0 catch-all → createPlatformHandler
 app/routes/api/health.ts      # alias → /api/platform/health
 app/routes/api/version.ts     # alias → /api/platform/version

@@ -74,6 +74,39 @@ When a host **does** still have subtree metadata, `git subtree pull` remains
 the documented path for that host.
 
 
+## 0.13.0
+
+`breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=true`
+(private schema only: `0005_idempotency.sql`), `appContractVersion=7`.
+
+Mutation registry: host writes as `POST /api/platform/mutations/:name` so the
+GUI and an LLM with an API key share one implementation. No historical SQL
+edits.
+
+1. Upgrade `/platform` (subtree pull **or** snapshot overlay above) to 0.13.0.
+   Confirm `platform/VERSION` is `0.13.0` and `/platform` has 0 diffs against
+   the release SHA.
+2. `runMigrations` applies `0005_idempotency.sql` (idempotency keys). Do not
+   edit older files.
+3. Add `app/mutations.ts` with an empty registry (or real mutations):
+
+   ```ts
+   import { defineMutations } from "../platform/src/mutations/index.js";
+
+   export const mutations = defineMutations({ mutations: [] });
+   ```
+
+   Pass it into `createPlatformHandler({ mutations })`.
+4. Mount `MutationsPage` at `/admin/mutations` or `/mutations`. Catch-all
+   already forwards POST from 0.7.0.
+5. Keep `setPgliteFactory` and the Nitro **closeBundle** PGlite copy; do
+   **not** replace `nitro({ hooks.compiled })`.
+
+Writes meant for the API or an LLM belong in `app/mutations.ts`, not ad-hoc
+server functions. Owner scoping is `mutationOwnerId(ctx.principal)` plus
+`WHERE user_id = owner` — never a client `user_id`. See `docs/MUTATIONS.md`.
+
+
 ## 0.12.0
 
 `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion=6` (unchanged).

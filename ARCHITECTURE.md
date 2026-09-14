@@ -99,7 +99,7 @@
 
 23. HTTP extension point (`src/http`):
 
-    * `createPlatformHandler({ appConfig, sessionSource, dataApi, getDatabase, healthExtras, designTokens })`.
+    * `createPlatformHandler({ appConfig, sessionSource, dataApi, getDatabase, healthExtras, designTokens, designMarkdown, mutations })`.
     * Internal registry of method + path (GET/POST/PUT/DELETE). New capabilities add routes here, not in the host.
     * Prefix `/api/platform`. Host aliases keep `/api/health`, `/api/version`, `/api/data/:resource`.
     * 0.7.0: `/me`, `/admin/users`, `/admin/access-policy`, `/api-keys`. Known path + wrong method is 405.
@@ -112,6 +112,12 @@
     * `uniqueBy` (implicit `id` when `id` is returned) makes `ORDER BY` unique within one owner. It need not be in `columns`. The application owns that uniqueness. OFFSET is not a snapshot. 0.12.0 adds a signed keyset `cursor` over `(orderBy, uniqueBy)`; `nextCursor` is additive.
     * HTTP for list is `GET /api/platform/data/:resource` via `createPlatformHandler`. Hosts keep a thin catch-all; they do not reimplement list routing.
     * `public`, `private`, and `app` are never published. Auth denylist is defense-in-depth.
+
+24a. Mutations extension point (`src/mutations`):
+
+    * Hosts call `defineMutations` and pass the registry to `createPlatformHandler`.
+    * `POST /api/platform/mutations/:name` runs the handler in a transaction on `ctx.db`. Roles gate the call. Client `user_id` is never identity (`mutationOwnerId`).
+    * Optional `Idempotency-Key` (24 h, `private.idempotency_keys`). Audit `mutation.<name>` stores a SHA-256 of the input, never the payload.
 
 25. Access extension point (`src/access`):
 

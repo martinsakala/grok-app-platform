@@ -30,7 +30,8 @@ no test entities, no demo content.
 - Never write a `.env` file. Never log or return `DATABASE_URL`, tokens,
   secrets or password hashes.
 - Never trust a client-supplied `user_id`, schema, table or SQL. Identity is
-  `requireUser()` from `app/auth.server.ts`, nothing else.
+  `requireUser()` from `app/auth.server.ts` or `ctx.principal` /
+  `mutationOwnerId` inside a mutation handler, nothing else.
 - Never publish. The user presses Publish. Never call a production E2E "done"
   before the user confirms it.
 - Never push application code to the platform upstream repository.
@@ -39,7 +40,7 @@ no test entities, no demo content.
 
 ```
 /platform/**   platform-owned   read-only here
-/app/**        application-owned   routes, domain code, migrations, data-api registry
+/app/**        application-owned   routes, domain code, migrations, data-api registry, mutations
 /src/**        Grok host chrome    do not put domain logic here
 root files     host/build glue only
 ```
@@ -80,6 +81,11 @@ TanStack `srcDirectory: "app"`, alias `@/*` → `/app/*`. Import Grok chrome fro
 - Read `design.md` (repo root) before building any UI. Follow its Voice. Use `--pf-*`;
   do not invent a second palette. Runtime overrides belong in `platform.design`
   via `/admin/design`, not a parallel CSS file.
+- Writes intended for the HTTP API or an LLM belong in `app/mutations.ts`
+  (`defineMutations`) and are passed to `createPlatformHandler`. Do not add
+  a parallel ad-hoc server function for the same write. Owner scoping is
+  `mutationOwnerId(ctx.principal)` and `WHERE user_id = owner`. Mount
+  `MutationsPage` at `/admin/mutations`.
 
 ## Before reporting done
 

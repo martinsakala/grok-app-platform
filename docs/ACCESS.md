@@ -119,6 +119,8 @@ All under `/api/platform` via `createPlatformHandler` (no extra host files).
 | `GET` / `POST` | `/api-keys` | principal (POST returns `key` once) |
 | `DELETE` | `/api-keys/:id` | owner of the key, or admin+ |
 | `GET` | `/data/:resource` | principal (session or `gk_` key) |
+| `GET` | `/mutations` | principal |
+| `POST` | `/mutations/:name` | principal + mutation roles |
 
 JSON bodies are limited to 32 KiB; invalid JSON → 400 `{ "error": "…", "code": "bad_request" }`.
 Known path, wrong method → 405 `{ "error": "Method Not Allowed" }` with `Allow`.

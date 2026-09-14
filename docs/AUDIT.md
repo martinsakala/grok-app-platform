@@ -35,6 +35,7 @@ await audit(principal, {
 | `settings.set` / `settings.delete` | setting written or deleted |
 | `design.set` | owner saved or reset `platform.design` |
 | `design.import` | owner imported markdown or a gallery preset |
+| `mutation.<name>` | `POST /mutations/:name` (every authenticated attempt) |
 
 Existing owner `/me` calls are not logged.
 
@@ -55,3 +56,7 @@ This is not a consistent snapshot: concurrent inserts can appear on a later
 page. No secrets in the payload.
 
 Unsigned → `401`. `member` → `403`. Invalid `limit`/`before` → `400`.
+
+`mutation.<name>` meta is `{ outcome, inputSha256, requestId, principalKind, principalId }`.
+`outcome` is `ok` | `invalid_input` | `forbidden` | `failed` | `conflict` |
+`replayed`. The request body is never stored. See `docs/MUTATIONS.md`.
