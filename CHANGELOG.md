@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0
+- **Design import / gallery / export.** `platform.design` may store `{ markdown, spec, source, preset? }` (full `DesignSpec`, including Voice) or the 0.10 form subset. `validateDesignOverride` accepts both. Public `GET /design` adds `override.source` (`markdown` \| `preset` \| `form`) and never returns markdown, Voice, or Brand.
+- **HTTP (owner):** `POST /design/import` `{ markdown }` or `{ preset }`; parse errors are `400 { code: "invalid_design", errors: [{ line, message }] }`. `GET /design/export` `text/markdown` (stored markdown, else host `designMarkdown`). `GET /design/gallery` `{ presets: [{ id, name, tagline, colors }] }`. `DELETE /design` still resets. Audit `design.import`.
+- **`createPlatformHandler` `designMarkdown`:** raw `design.md`. Tokens are derived from it when `designTokens` is omitted (`designTokens` remains for compatibility and wins when both are set).
+- **Gallery:** six presets in `src/design/gallery/*.md` (dark-neutral, light-neutral, warm, cool, high-contrast, mono), generated to `src/design/generated/gallery.ts`. `npm run generate` includes gallery; CI diffs that directory.
+- **UI:** `DesignPage` sections Import (textarea, upload `.md`, Validate line errors, Apply), Gallery (swatches, Use), Export (Download `design.md` + “Commit this file to the repo root…”), Copy prompt for an LLM (`DESIGN_PROMPT`), Fine-tune, Reset. Client: `importDesign`, `exportDesign`, `listDesignGallery`.
+- Host: `requiresAppChanges=true` (pass `designMarkdown`; DesignPage already mounted). `breaking=false`, `requiresDatabaseMigration=false`, `appContractVersion=6`. Menu unification (`AppShell` vs `AdminLayout`) is a host choice; `AppShell` is the recommended default for mother-app.
+- **Docs:** `docs/DESIGN.md` (import/export/gallery, one truth = repo `design.md`, `DESIGN_PROMPT`). No historical migration edits.
+
 ## 0.10.0
 - **Design contract** (`src/design`): `parseDesignMd` reads Markdown `design.md` (Brand, Colors, Typography, Shape, Voice) with line-numbered errors. `generateTokensCss` emits `--pf-*` matching `src/ui/tokens.css`, plus `[data-pf-theme=light|dark]` when both palettes exist. Voice never becomes CSS. CLI: `node --experimental-strip-types scripts/generate-design-tokens.mjs <design.md> <out.css>`.
 - **Runtime overrides**: settings key `platform.design` (owner JSON subset). Public `GET /api/platform/design` returns merged tokens (host `designTokens` + override). Owner `PUT` / `DELETE /design`; audit `design.set`. Corrupt override is ignored.

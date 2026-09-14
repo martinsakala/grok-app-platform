@@ -74,6 +74,48 @@ When a host **does** still have subtree metadata, `git subtree pull` remains
 the documented path for that host.
 
 
+## 0.11.0
+
+`breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=false`, `appContractVersion=6`.
+
+Import, gallery, and export for `design.md`. `platform.design` may hold a
+full `{ markdown, spec }` document or the old form subset. No new SQL. Do
+not edit historical migrations.
+
+1. Upgrade `/platform` (subtree pull **or** snapshot overlay above) to 0.11.0.
+   Confirm `platform/VERSION` is `0.11.0` and `/platform` has 0 diffs against
+   the release SHA.
+2. Pass raw `design.md` into the handler. Tokens are derived from it when
+   `designTokens` is omitted; `designTokens` still wins if both are set.
+
+   ```ts
+   import designMd from "../../design.md?raw";
+
+   createPlatformHandler({
+     appConfig,
+     sessionSource,
+     getDatabase,
+     designMarkdown: designMd,
+   });
+   ```
+
+3. `DesignPage` is already mounted from 0.10.0 (`app/routes/admin/design.tsx`).
+   0.11 expands it: Import (paste / upload / Validate / Apply), Gallery (Use),
+   Export (Download `design.md` + copy LLM prompt), Fine-tune, Reset. Catch-all
+   already forwards POST from 0.7.0.
+4. Menu unification is a **host choice**. Recommended default for mother-app:
+   wrap admin pages in `AppShell` (host nav) instead of `AdminLayout`, so the
+   chrome matches the rest of the app. `AdminLayout` remains supported.
+5. Keep `setPgliteFactory` and the Nitro **closeBundle** PGlite copy; do
+   **not** replace `nitro({ hooks.compiled })`.
+
+After upgrade, unsigned preview: `GET /api/platform/design` 200, `override: null`
+or `{ …, source }`. `POST /design/import` 401. Signed-in owner: Import Apply
+writes `platform.design` as a document; Gallery Use does the same with
+`source: "preset"`; Export downloads markdown (stored, else `designMarkdown`);
+Reset restores build-time. Commit the downloaded `design.md` at the repo root
+— the coding agent reads the file, not the database. See `docs/DESIGN.md`.
+
 ## 0.10.0
 
 `breaking=false`, `requiresAppChanges=true`, `requiresDatabaseMigration=false`, `appContractVersion=5`.

@@ -7,7 +7,9 @@ admin audit log. **The host catch-all must list PUT and DELETE** — TanStack
 Start does not forward unlisted methods, so `requiresAppChanges=false` in
 0.7.0/0.8.0 was incorrect on that point. 0.9.0 adds a UI client over these
 routes; it does not add HTTP routes. 0.10.0 adds public `GET /design` and
-owner `PUT`/`DELETE /design`.
+owner `PUT`/`DELETE /design`. 0.11.0 adds owner `POST /design/import`,
+`GET /design/export`, `GET /design/gallery`, and optional handler
+`designMarkdown`.
 
 ## Prefix
 
@@ -31,6 +33,9 @@ the host rewrites those paths onto the same handler.
 | `GET` | `/api/platform/admin/audit` | admin+ |
 | `GET` | `/api/platform/design` | public |
 | `PUT` / `DELETE` | `/api/platform/design` | owner |
+| `POST` | `/api/platform/design/import` | owner. Body `{ markdown }` or `{ preset }` |
+| `GET` | `/api/platform/design/export` | owner. `text/markdown` |
+| `GET` | `/api/platform/design/gallery` | owner |
 | `HEAD` / `OPTIONS` | same paths | public / same as matching GET |
 
 Unknown **path** → `404 { "error": "Not Found", "code": "not_found" }`.
@@ -49,7 +54,8 @@ export const handlePlatform = createPlatformHandler({
   dataApi,
   getDatabase,
   healthExtras: async () => ({ /* host connection snapshot */ }),
-  designTokens, // optional build-time --pf-* map from design.md
+  designTokens,   // optional explicit --pf-* map; wins over designMarkdown
+  designMarkdown, // optional raw design.md; tokens derived when designTokens omitted
 });
 ```
 
@@ -71,6 +77,7 @@ not_found`.
 | `UnauthorizedError` | 401 | `{ "error": "Unauthorized" }` |
 | `ForbiddenError` | 403 | `{ "error": "Forbidden", "code": "forbidden" \| "not_allowed" }` |
 | `BadRequestError` | 400 | `{ "error": message, "code": "bad_request" }` |
+| import `DesignParseError` | 400 | `{ "error": message, "code": "invalid_design", "errors": [{ "line", "message" }] }` |
 | `MethodNotAllowedError` | 405 | `{ "error": "Method Not Allowed" }` + `Allow` |
 | `DataApiError` | its `status` | `{ "error": message, "code": code }` |
 | anything else | 500 | `{ "error": "Internal Server Error" }` + `logError` |

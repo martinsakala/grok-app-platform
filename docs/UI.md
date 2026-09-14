@@ -24,11 +24,12 @@ export const platformClient = createPlatformClient({
 });
 ```
 
-Typed methods cover every 0.8.0 route plus 0.10.0 design: `me`, `health`, `version`,
+Typed methods cover every 0.8.0 route plus 0.10.0/0.11.0 design: `me`, `health`, `version`,
 `listUsers` / `setUserRoles`, `getAccessPolicy` / `setAccessPolicy`,
 `listApiKeys` / `createApiKey` / `revokeApiKey`, `listSettings` /
 `getSetting` / `setSetting` / `deleteSetting`, `listAudit`, `listData`,
-`getDesign` / `setDesign` / `resetDesign`.
+`getDesign` / `setDesign` / `resetDesign` / `importDesign` / `exportDesign` /
+`listDesignGallery`.
 
 Failures become `PlatformClientError { status, code, message }`. Only the
 JSON fields `error` and `code` are copied. Tokens, hashes, and `gk_` keys
@@ -49,7 +50,7 @@ Pages take a `client` prop. They must not call `fetch` themselves.
 | `ApiKeysPage` | Own keys; create shows plaintext once; revoke |
 | `SettingsPage` | Member read; admin write; `platform.*` owner |
 | `AuditPage` | Admin+: `before=id` pagination and action/entity filters |
-| `DesignPage` | Owner: colors / fonts / radius, live preview, Save → `platform.design`, Reset |
+| `DesignPage` | Owner: Import (paste/upload/Validate/Apply), Gallery (Use), Export (Download `design.md` + copy LLM prompt), Fine-tune, Reset |
 
 Every page has loading / empty / error / 403 states. Optional `preview` is
 for tests (`renderToString`); hosts omit it.

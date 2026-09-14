@@ -39,6 +39,7 @@ Unsigned → `401`. Wrong role → `403`.
 Writes are audit-logged (`settings.set` / `settings.delete`). Meta is redacted
 the same way as the logger (secret-like keys, connection strings, Bearer
 tokens). Do not store API keys or passwords in settings values.
-`platform.design` is the 0.10.0 design override; prefer
-`PUT`/`DELETE /api/platform/design` (audit `design.set`) over writing that
-key through this API. See `docs/DESIGN.md`.
+`platform.design` is the design overlay (0.11 document `{ markdown, spec }` or
+0.10 form subset); prefer `/api/platform/design` (import / PUT / DELETE, audit
+`design.import` / `design.set`) over writing that key through this API. See
+`docs/DESIGN.md`.

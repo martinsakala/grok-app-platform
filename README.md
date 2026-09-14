@@ -63,20 +63,23 @@ domain layer on top of an unchanged, upgradable platform.
 | `auth` | `platform/src/auth` | `requireUser` / `getCurrentUser` / `getCurrentSession` over the Grok Better Auth session, `assignOwner`, `ownerIdFromSession`. No OAuth implemented here. |
 | `data-api` | `platform/src/data-api` | `defineDataApi` + `listResource`: read-only, allowlisted, owner-scoped list over views in schema `api` |
 | `logging` | `platform/src/logging` | `createLogger` / `logError`: one JSON line, secret keys and connection strings redacted |
-| `http` | `platform/src/http` | `createPlatformHandler`: `/api/platform/health`, `/version`, `/data/:resource`, plus `/me`, `/admin/*`, `/api-keys`, `/settings`, `/admin/audit`, `/design` |
+| `http` | `platform/src/http` | `createPlatformHandler`: `/api/platform/health`, `/version`, `/data/:resource`, plus `/me`, `/admin/*`, `/api-keys`, `/settings`, `/admin/audit`, `/design` (import / export / gallery) |
 | `access` | `platform/src/access` | roles, first-user-as-owner bootstrap, allowlist policy |
 | `api-keys` | `platform/src/api-keys` | hashed `gk_` keys; plaintext once; data scoped to the key owner |
 | `settings` | `platform/src/settings` | JSON documents in `private.settings`; `platform.*` owner-only writes |
 | `audit` | `platform/src/audit` | append-only `private.audit_log`; admin cursor list; no retention job |
 | `ui` | `platform/src/ui` | typed `createPlatformClient`, AppShell / AdminLayout, admin pages (incl. Design), `--pf-*` tokens. Host mounts; no router in the platform |
-| `design` | `platform/src/design` | `design.md` parser, `--pf-*` CSS generator, runtime override merge. Voice never becomes CSS |
+| `design` | `platform/src/design` | `design.md` parser, `--pf-*` CSS generator, runtime document/form overlay, gallery presets, `DESIGN_PROMPT`. Voice never becomes CSS |
 
 Server APIs stay server-only. Login UI stays in the application. HTTP under
 `/api/platform` is served by `createPlatformHandler`; hosts mount one catch-all
 (GET/POST/PUT/DELETE/OPTIONS/HEAD) plus aliases. 0.9.0 adds a **UI zone**:
 the platform owns admin pages; the host only mounts them (see `docs/UI.md`).
 0.10.0 adds **`design.md`**: build-time tokens plus an owner runtime override
-(see `docs/DESIGN.md`). Hosts that landed `/platform` as a snapshot (no subtree
+(see `docs/DESIGN.md`). 0.11.0 adds **import, gallery, and export** so an owner
+can paste, upload, or pick a preset in `/admin/design` and apply it immediately;
+commit the downloaded `design.md` to the repo root (the coding agent reads the
+file, not the database). Hosts that landed `/platform` as a snapshot (no subtree
 metadata) copy the upstream tree instead of `git subtree pull` — `docs/UPGRADING.md`.
 
 ## How it works

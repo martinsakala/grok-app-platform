@@ -1,9 +1,14 @@
-# Design contract (0.10.0)
+# Design contract (0.11.0)
 
 `design.md` is the visual contract of an application. A human can read it.
 An agent reads it **before writing UI**. The platform turns it into `--pf-*`
-CSS variables at build time and lets an owner override a subset at runtime
-without a rebuild.
+CSS variables at build time and lets an owner import, pick, or fine-tune a
+design at runtime without a rebuild.
+
+**One source of truth is the repo-root `design.md`.** The coding agent reads
+that file, not the database. Runtime `platform.design` is an owner overlay
+for live preview and for applying a pasted / uploaded / gallery document
+until someone commits the export.
 
 Voice (tone / do / don't) is for the agent. It **never** becomes CSS.
 
@@ -12,14 +17,32 @@ Voice (tone / do / don't) is for the agent. It **never** becomes CSS.
 | Layer | Source | When it applies | Who writes it |
 | --- | --- | --- | --- |
 | Build-time | repo-root `design.md` → `app/design-tokens.css` | every page load, even before JS | whoever edits `design.md` + host build |
-| Runtime | settings key `platform.design` | merged on top of build-time tokens | owner, via Design page or `PUT /design` |
+| Runtime | settings key `platform.design` | document replaces build-time tokens; form overlay merges on top | owner, via Design page, import, gallery, or `PUT /design` |
 
 `GET /api/platform/design` is **public** and secret-free. It returns
 `{ tokens, override }`. `tokens` is the merge the GUI should inject.
-`override` is the stored JSON subset, or `null`.
+`override` is the public JSON subset (`colors` / `typography` / `shape`) plus
+`source` (`markdown` \| `preset` \| `form`), or `null`. Public GET never
+returns the markdown body, Voice, or Brand.
 
 A corrupt stored override is treated as missing (GET stays 200, tokens =
 build-time). Reset (`DELETE /design`) deletes `platform.design`.
+
+## Stored `platform.design`
+
+Two shapes, both accepted by `validateDesignOverride`. Old 0.10 rows keep
+working.
+
+1. **Document (0.11)** — `{ markdown, spec, source, preset? }`. `spec` is the
+   full `DesignSpec` including Voice. Tokens come from `spec` (full replace of
+   build-time CSS, gaps filled from defaults).
+2. **Form overlay (0.10)** — `{ colors?, typography?, shape?, source?: "form" }`.
+   Merged onto build-time tokens. No Voice, no Brand.
+
+`POST /design/import` writes a document (`source: markdown` or `preset`).
+`PUT /design` writes a form overlay (`source: form`). Fine-tune after import
+is **lossy**: it replaces the stored document with the color/font/radius
+subset.
 
 ## File format
 
@@ -79,7 +102,9 @@ Hex only: `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`. Colors are the only
 values type-checked as hex. Fonts, radii, density, and Voice are free text
 (Voice may be empty-looking but the keys must be present).
 
-A sample for mother-app is [`docs/host/design.md`](host/design.md).
+A sample for mother-app is [`docs/host/design.md`](host/design.md). Six
+gallery presets live in `src/design/gallery/*.md` and are generated into
+`src/design/generated/gallery.ts`.
 
 ## CSS names
 
@@ -102,12 +127,21 @@ import {
   tokensFromSpec,
   applyOverride,
   validateDesignOverride,
+  tokensFromStored,
+  publicOverride,
+  DESIGN_PROMPT,
+  DESIGN_GALLERY,
 } from "../platform/src/design/index.js";
 ```
 
 `parseDesignMd` throws `DesignParseError` (`error.line`, message prefixed
 `design.md:N:`). `validateDesignOverride` throws `BadRequestError` (HTTP 400).
-The JSON subset is `{ colors?, typography?, shape? }` — **no Voice, no Brand**.
+The form subset is `{ colors?, typography?, shape?, source? }` — **no Voice,
+no Brand**. A document is `{ markdown?, spec?, source?, preset? }`.
+
+`DESIGN_PROMPT` is the instruction + template for an LLM to emit a valid
+`design.md` (markdown only, no fences). Copy it from DesignPage or import
+the constant.
 
 ## CLI
 
@@ -118,28 +152,42 @@ node --experimental-strip-types platform/scripts/generate-design-tokens.mjs \
 
 Missing args → exit 2. Parse error → exit 1 with the line-numbered message.
 
+Gallery (committed generated file):
+
+```bash
+node --experimental-strip-types platform/scripts/generate-design-gallery.mjs
+```
+
 ## HTTP
 
 | Method | Path | Who |
 | --- | --- | --- |
-| `GET` | `/api/platform/design` | public |
-| `PUT` | `/api/platform/design` | owner. Body = override JSON (not `{value:…}`) |
-| `DELETE` | `/api/platform/design` | owner. Reset to build-time |
+| `GET` | `/api/platform/design` | public. `{ tokens, override }`. `override.source` is `markdown` \| `preset` \| `form` or override is `null`. No markdown body. |
+| `PUT` | `/api/platform/design` | owner. Body = form overlay JSON (not `{value:…}`). Sets `source: form`. |
+| `DELETE` | `/api/platform/design` | owner. Reset to build-time. |
+| `POST` | `/api/platform/design/import` | owner. `{ markdown }` or `{ preset: id }`. Saves `{ markdown, spec, source }`. Parse error → `400 { code: "invalid_design", errors: [{ line, message }] }`. |
+| `GET` | `/api/platform/design/export` | owner. `text/markdown`: stored markdown, else host `designMarkdown`. 404 if neither. |
+| `GET` | `/api/platform/design/gallery` | owner. `{ presets: [{ id, name, tagline, colors }] }`. |
 
-Host passes build-time tokens into the handler:
+Host options:
 
 ```ts
 createPlatformHandler({
   appConfig,
   sessionSource,
   getDatabase,
-  designTokens: tokensFromSpec(parseDesignMd(designMdRaw)),
+  designMarkdown, // raw repo-root design.md; tokens are derived if designTokens is omitted
+  designTokens,   // optional explicit --pf-* map; wins over designMarkdown when both are set
 });
 ```
 
-PUT also writes `platform.design` through settings, so the audit log has
-both `settings.set` and `design.set`. DELETE logs `design.set` with
-`{reset:true}` (and `settings.delete` when the key existed).
+When `designMarkdown` is set and `designTokens` is not, the handler parses it
+for build-time tokens and for export fallback. `designTokens` remains for
+compatibility.
+
+Import audits `design.import` with `{ source, preset? }`. PUT/DELETE audit
+`design.set`. Both also write through settings (`settings.set` /
+`settings.delete`).
 
 ## AppShell / DesignPage
 
@@ -147,8 +195,29 @@ both `settings.set` and `design.set`. DELETE logs `design.set` with
 `designUrl` is set they fetch it on mount and inject `<style>` so a GUI
 save is visible without rebuild. Fallback is `tokens.css` / generated CSS.
 
-`DesignPage` is owner-only: color / font / radius form, live preview, Save
-(`platform.design`), Reset. Mount at `/admin/design`.
+`DesignPage` is owner-only. Sections:
+
+- **Import** — paste or upload `.md`, Validate (line errors), Apply (import +
+  live tokens before save).
+- **Gallery** — swatches from `DESIGN_GALLERY`, Use imports that preset.
+- **Export** — Download `design.md`. Copy the prompt for an LLM
+  (`DESIGN_PROMPT`). Reminder: *Commit this file to the repo root: the coding
+  agent reads design.md from the repository, not from the database.*
+- **Fine-tune** — color / font / radius form, Save (`PUT`), Reset (`DELETE`).
+
+Mount at `/admin/design`. Client methods: `getDesign`, `setDesign`,
+`resetDesign`, `importDesign`, `exportDesign`, `listDesignGallery`.
+
+## Export flow
+
+1. Owner imports, picks a gallery preset, or fine-tunes in `/admin/design`.
+2. Download `design.md`.
+3. Commit it at the **repository root** as `design.md`.
+4. The next host build regenerates `app/design-tokens.css`. Reset the runtime
+   overlay when the committed file should be the only source.
+
+Until that commit, the overlay lives only in `platform.design`. Agents must
+not treat the database as the contract.
 
 ## How an agent uses this
 
@@ -156,4 +225,6 @@ save is visible without rebuild. Fallback is `tokens.css` / generated CSS.
 2. Follow Voice. Do not invent a second palette or a parallel token set.
 3. Use `--pf-*` (and Tailwind utilities that reference them). Do not hardcode
    hex in components except as `design.md` values flowing through tokens.
-4. Do not put Voice into CSS or into `platform.design`.
+4. Do not put Voice into CSS. Do not dump markdown on public `GET /design`.
+5. If you generate a new look, output only a `design.md` that `parseDesignMd`
+   accepts (see `DESIGN_PROMPT`).
