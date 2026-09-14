@@ -168,4 +168,34 @@ describe("createPlatformClient", () => {
     expect(page.items).toEqual([{ id: "a1" }]);
     expect(page.nextCursor).toBeNull();
   });
+
+  it("listMutations and runMutation with Idempotency-Key", async () => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/mutations") && (!init?.method || init.method === "GET")) {
+        return jsonResponse(200, {
+          mutations: [
+            {
+              name: "create-note",
+              description: "Create a note",
+              roles: ["member"],
+              input: { fields: { text: { type: "string", required: true } } },
+            },
+          ],
+        });
+      }
+      if (url.endsWith("/mutations/create-note") && init?.method === "POST") {
+        const headers = new Headers(init.headers);
+        expect(headers.get("Idempotency-Key")).toBe("abc");
+        expect(init.body).toBe(JSON.stringify({ text: "hi" }));
+        return jsonResponse(200, { ok: true, result: { id: "n1" } });
+      }
+      return jsonResponse(500, { error: "Internal Server Error" });
+    });
+    const client = createPlatformClient({ fetch: fetchFn as unknown as typeof fetch });
+    const listed = await client.listMutations();
+    expect(listed.mutations[0]?.name).toBe("create-note");
+    const ran = await client.runMutation("create-note", { text: "hi" }, { idempotencyKey: "abc" });
+    expect(ran).toEqual({ ok: true, result: { id: "n1" } });
+  });
 });

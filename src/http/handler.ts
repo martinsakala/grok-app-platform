@@ -30,6 +30,16 @@ import {
 } from "../design/index.js";
 import { DesignParseError } from "../design/types.js";
 import {
+  executeMutation,
+  isMutationError,
+  isMutationFailedError,
+  isMutationInputError,
+  isUnknownMutationError,
+  listVisibleMutations,
+  resolveRequestId,
+  type MutationRegistry,
+} from "../mutations/index.js";
+import {
   deleteSetting,
   getSetting,
   getSettingRecord,
@@ -53,6 +63,8 @@ export type PlatformHandlerOptions = {
   designTokens?: DesignTokens | (() => DesignTokens | Promise<DesignTokens>);
   /** Raw repo-root design.md. When set, tokens are derived from it unless designTokens is also set. */
   designMarkdown?: string | (() => string | Promise<string | null | undefined>);
+  /** Host mutation registry. Omit to hide GET/POST /mutations (404). */
+  mutations?: MutationRegistry;
 };
 
 type RouteParams = Record<string, string>;
@@ -120,6 +132,18 @@ function mapError(error: unknown): Response {
   }
   if (isDataApiError(error)) {
     return json({ error: error.message, code: error.code }, error.status);
+  }
+  if (isMutationInputError(error)) {
+    return json({ error: error.message, code: error.code, errors: error.errors }, 400);
+  }
+  if (isUnknownMutationError(error)) {
+    return json({ error: error.message, code: error.code }, 404);
+  }
+  if (isMutationError(error)) {
+    return json({ error: error.message, code: error.code }, 409);
+  }
+  if (isMutationFailedError(error)) {
+    return json({ error: error.message, code: error.code }, 500);
   }
   logError(logger, error, "request failed");
   return json({ error: "Internal Server Error" }, 500);
@@ -427,6 +451,27 @@ async function galleryDesignRoute(ctx: RouteContext): Promise<Response> {
   });
 }
 
+async function listMutationsRoute(ctx: RouteContext): Promise<Response> {
+  if (!ctx.options.mutations) return notFound();
+  const principal = await principalOf(ctx);
+  return json({ mutations: listVisibleMutations(ctx.options.mutations, principal) });
+}
+
+async function runMutationRoute(ctx: RouteContext): Promise<Response> {
+  if (!ctx.options.mutations) return notFound();
+  const principal = await principalOf(ctx);
+  const input = await readJsonBody(ctx.request);
+  const result = await executeMutation({
+    registry: ctx.options.mutations,
+    principal,
+    name: ctx.params.name,
+    input,
+    idempotencyKey: ctx.request.headers.get("idempotency-key"),
+    requestId: resolveRequestId(ctx.request.headers.get("x-request-id")),
+  });
+  return json({ ok: true, result });
+}
+
 const routes: Route[] = [
   { method: "GET", pattern: "/health", handler: healthRoute },
   { method: "GET", pattern: "/version", handler: versionRoute },
@@ -450,6 +495,8 @@ const routes: Route[] = [
   { method: "PUT", pattern: "/settings/:key", handler: putSettingRoute },
   { method: "DELETE", pattern: "/settings/:key", handler: deleteSettingRoute },
   { method: "GET", pattern: "/admin/audit", handler: listAuditRoute },
+  { method: "GET", pattern: "/mutations", handler: listMutationsRoute },
+  { method: "POST", pattern: "/mutations/:name", handler: runMutationRoute },
 ];
 
 function methodsForPath(rest: string): { methods: HttpMethod[]; params: RouteParams } | null {

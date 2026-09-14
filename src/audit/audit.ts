@@ -15,7 +15,8 @@ export type AuditAction =
   | "settings.set"
   | "settings.delete"
   | "design.set"
-  | "design.import";
+  | "design.import"
+  | `mutation.${string}`;
 
 export type AuditInput = {
   action: string;

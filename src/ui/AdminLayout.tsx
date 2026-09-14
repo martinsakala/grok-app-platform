@@ -11,6 +11,7 @@ export const DEFAULT_ADMIN_NAV: NavItem[] = [
   { label: "Access policy", href: "/admin/access-policy" },
   { label: "API keys", href: "/admin/api-keys" },
   { label: "Settings", href: "/admin/settings" },
+  { label: "Mutations", href: "/admin/mutations" },
   { label: "Design", href: "/admin/design" },
   { label: "Audit", href: "/admin/audit" },
 ];

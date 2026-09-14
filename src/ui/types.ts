@@ -5,10 +5,11 @@ import type { ApiKeyView, CreatedApiKey } from "../api-keys/keys.js";
 import type { AuditEntry } from "../audit/audit.js";
 import type { ListResourceResult } from "../data-api/types.js";
 import type { DesignOverride, DesignSource, DesignTokens, ColorTokens } from "../design/index.js";
+import type { ListedMutation, MutationInputErrorItem } from "../mutations/index.js";
 import type { HealthResponse, VersionResponse } from "../runtime/types.js";
 import type { SettingRecord } from "../settings/settings.js";
 
-export type { Role, AccessPolicy, ListedUser, ApiKeyView, CreatedApiKey, AuditEntry, ListResourceResult, HealthResponse, VersionResponse, SettingRecord, DesignOverride, DesignTokens, DesignSource };
+export type { Role, AccessPolicy, ListedUser, ApiKeyView, CreatedApiKey, AuditEntry, ListResourceResult, HealthResponse, VersionResponse, SettingRecord, DesignOverride, DesignTokens, DesignSource, ListedMutation, MutationInputErrorItem };
 
 export type DesignResponse = {
   tokens: DesignTokens;
@@ -78,4 +79,12 @@ export type ListDataQuery = {
 export type NavItem = {
   label: string;
   href: string;
+};
+
+export type MutationsList = { mutations: ListedMutation[] };
+
+export type MutationRunResult = { ok: true; result: unknown };
+
+export type RunMutationOptions = {
+  idempotencyKey?: string;
 };

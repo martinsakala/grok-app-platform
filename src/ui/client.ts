@@ -15,7 +15,10 @@ import type {
   ListDataQuery,
   ListResourceResult,
   MeResponse,
+  MutationRunResult,
+  MutationsList,
   Role,
+  RunMutationOptions,
   SettingRecord,
   SettingsList,
   UsersList,
@@ -51,6 +54,12 @@ export type PlatformClient = {
   importDesign: (input: DesignImportInput) => Promise<DesignResponse>;
   exportDesign: () => Promise<string>;
   listDesignGallery: () => Promise<DesignGalleryResponse>;
+  listMutations: () => Promise<MutationsList>;
+  runMutation: (
+    name: string,
+    input: unknown,
+    options?: RunMutationOptions,
+  ) => Promise<MutationRunResult>;
 };
 
 function trimBase(baseUrl: string): string {
@@ -196,5 +205,14 @@ export function createPlatformClient(options: PlatformClientOptions = {}): Platf
       }
       return text;
     },
+    listMutations: () => request<MutationsList>("/mutations"),
+    runMutation: (name, input, runOptions = {}) =>
+      request<MutationRunResult>(`/mutations/${encodeURIComponent(name)}`, {
+        method: "POST",
+        body: JSON.stringify(input ?? {}),
+        headers: runOptions.idempotencyKey
+          ? { "Idempotency-Key": runOptions.idempotencyKey }
+          : undefined,
+      }),
   };
 }

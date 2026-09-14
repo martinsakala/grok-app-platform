@@ -8,6 +8,7 @@ import { ApiKeysPage } from "../src/ui/ApiKeysPage.js";
 import { AppShell } from "../src/ui/AppShell.js";
 import { AuditPage } from "../src/ui/AuditPage.js";
 import { DesignPage } from "../src/ui/DesignPage.js";
+import { MutationsPage } from "../src/ui/MutationsPage.js";
 import { ErrorBoundary } from "../src/ui/ErrorBoundary.js";
 import { PlatformClientError } from "../src/ui/errors.js";
 import { SettingsPage } from "../src/ui/SettingsPage.js";
@@ -43,6 +44,8 @@ function unusedClient(): PlatformClient {
     importDesign: fail,
     exportDesign: fail,
     listDesignGallery: fail,
+    listMutations: fail,
+    runMutation: fail,
   };
 }
 
@@ -90,6 +93,8 @@ describe("platform UI pages", () => {
     expect(admin).toContain("Admin body");
     expect(admin).toContain("Design");
     expect(admin).toContain('href="/admin/design"');
+    expect(admin).toContain("Mutations");
+    expect(admin).toContain('href="/admin/mutations"');
     const withTokens = renderToString(
       <AppShell appName="mother-app" tokens={{ "--pf-bg": "#111111", "--pf-accent": "#abcdef" }}>
         <p>Hello</p>
@@ -331,6 +336,42 @@ describe("platform UI pages", () => {
     expect(data).toContain("Copy prompt for an LLM");
     expect(data).toContain("Download design.md");
     expect(data).toContain(DEFAULT_TOKENS["--pf-accent"]);
+  });
+
+  it("MutationsPage states", () => {
+    expect(renderToString(<MutationsPage client={client} preview={{ status: "loading" }} />)).toContain(
+      "Loading mutations",
+    );
+    expect(renderToString(<MutationsPage client={client} preview={{ status: "forbidden" }} />)).toContain(
+      "Member role required",
+    );
+    expect(
+      renderToString(<MutationsPage client={client} preview={{ status: "error", error: new Error("boom") }} />),
+    ).toContain("boom");
+    const empty = renderToString(
+      <MutationsPage client={client} preview={{ status: "data", me: member, mutations: [] }} />,
+    );
+    expect(empty).toContain("No mutations");
+    const data = renderToString(
+      <MutationsPage
+        client={client}
+        preview={{
+          status: "data",
+          me: owner,
+          mutations: [
+            {
+              name: "create-note",
+              description: "Create a note",
+              roles: ["member"],
+              input: { fields: { text: { type: "string", required: true } } },
+            },
+          ],
+        }}
+      />,
+    );
+    expect(data).toContain("create-note");
+    expect(data).toContain("Run");
+    expect(data).toContain('data-mutation-name="create-note"');
   });
 
   it("member UsersPage 403 vs owner data; client error mapping 403", () => {

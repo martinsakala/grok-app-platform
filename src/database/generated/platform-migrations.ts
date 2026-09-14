@@ -17,5 +17,9 @@ export const PLATFORM_MIGRATIONS: readonly { filename: string; sql: string }[] =
   {
     "filename": "0004_settings_audit.sql",
     "sql": "-- Platform 0.8.0: settings and append-only audit log.\n-- Operational data in private. No FK to public.\"user\".\n\ncreate table if not exists private.settings (\n  key text primary key,\n  value jsonb not null,\n  updated_by text,\n  updated_at timestamptz not null default now()\n);\n\ncreate table if not exists private.audit_log (\n  id bigserial primary key,\n  at timestamptz not null default now(),\n  principal_kind text not null,\n  principal_id text not null,\n  principal_label text not null,\n  action text not null,\n  entity text not null,\n  entity_id text,\n  meta jsonb\n);\n\ncreate index if not exists audit_log_at_desc on private.audit_log (at desc);\ncreate index if not exists audit_log_entity on private.audit_log (entity, entity_id);\n"
+  },
+  {
+    "filename": "0005_idempotency.sql",
+    "sql": "-- Platform 0.13.0: idempotency keys for mutation HTTP.\n-- Operational data in private. No FK to public.\"user\". Historical files unchanged.\n\ncreate table if not exists private.idempotency_keys (\n  principal_id text not null,\n  mutation text not null,\n  key text not null,\n  request_hash text not null,\n  response jsonb,\n  created_at timestamptz not null default now(),\n  primary key (principal_id, mutation, key)\n);\n\ncreate index if not exists idempotency_keys_created_at on private.idempotency_keys (created_at);\n"
   }
 ];

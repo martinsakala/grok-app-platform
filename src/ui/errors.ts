@@ -4,12 +4,19 @@
 export class PlatformClientError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly errors?: { path: string; message: string }[];
 
-  constructor(status: number, code: string, message: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    errors?: { path: string; message: string }[],
+  ) {
     super(message);
     this.name = "PlatformClientError";
     this.status = status;
     this.code = code;
+    this.errors = errors;
   }
 }
 
@@ -46,5 +53,15 @@ export function mapResponseError(status: number, body: unknown): PlatformClientE
     typeof record.code === "string" && record.code.trim()
       ? record.code
       : defaultErrorCode(status);
-  return new PlatformClientError(status, code, message);
+  let errors: { path: string; message: string }[] | undefined;
+  if (Array.isArray(record.errors)) {
+    const parsed = record.errors.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const item = entry as { path?: unknown; message?: unknown };
+      if (typeof item.path !== "string" || typeof item.message !== "string") return [];
+      return [{ path: item.path, message: item.message }];
+    });
+    if (parsed.length) errors = parsed;
+  }
+  return new PlatformClientError(status, code, message, errors);
 }

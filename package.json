@@ -15,7 +15,8 @@
     "./settings": "./src/settings/index.ts",
     "./audit": "./src/audit/index.ts",
     "./ui": "./src/ui/index.ts",
-    "./design": "./src/design/index.ts"
+    "./design": "./src/design/index.ts",
+    "./mutations": "./src/mutations/index.ts"
   },
   "scripts": {
     "generate:version": "node scripts/generate-platform-version.mjs",

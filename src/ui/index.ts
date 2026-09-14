@@ -11,6 +11,7 @@ export { ApiKeysPage, type ApiKeysPreview } from "./ApiKeysPage.js";
 export { SettingsPage, type SettingsPreview } from "./SettingsPage.js";
 export { AuditPage, type AuditPreview } from "./AuditPage.js";
 export { DesignPage, type DesignPreview } from "./DesignPage.js";
+export { MutationsPage, type MutationsPreview } from "./MutationsPage.js";
 export type {
   MeResponse,
   NavItem,
@@ -23,4 +24,8 @@ export type {
   DesignGalleryPreset,
   DesignGalleryResponse,
   DesignImportInput,
+  ListedMutation,
+  MutationsList,
+  MutationRunResult,
+  RunMutationOptions,
 } from "./types.js";
