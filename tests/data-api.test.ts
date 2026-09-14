@@ -312,3 +312,182 @@ describe("listResource allowlist and inputs", () => {
     );
   });
 });
+
+const rankResource = {
+  name: "rank-items",
+  relation: "rank_items",
+  columns: ["title", "rank"] as const,
+  ownerColumn: "user_id",
+  orderBy: "rank",
+  uniqueBy: "item_key",
+};
+
+async function seedRankItems() {
+  const db = await seed();
+  await db.query(`
+    create table app.rank_items (
+      item_key text not null,
+      user_id text not null,
+      title text not null,
+      rank int not null,
+      primary key (user_id, item_key)
+    )
+  `);
+  await db.query(`
+    create view api.rank_items as
+    select item_key, user_id, title, rank
+    from app.rank_items
+  `);
+  await db.query(
+    `insert into app.rank_items (item_key, user_id, title, rank) values
+      ('k2', $1, 'alice-k2', 1),
+      ('k1', $1, 'alice-k1', 1),
+      ('k3', $1, 'alice-k3', 1),
+      ('k4', $1, 'alice-k4', 2),
+      ('k5', $1, 'alice-k5', 2),
+      ('k1', $2, 'bob-k1', 1)`,
+    [alice.id, bob.id],
+  );
+  return db;
+}
+
+function rankRegistry(
+  overrides: Partial<{
+    name: string;
+    relation: string;
+    columns: readonly string[];
+    ownerColumn: string;
+    orderBy: string;
+    uniqueBy: string;
+    orderDirection: "asc" | "desc";
+  }> = {},
+) {
+  return defineDataApi({
+    resources: [
+      {
+        ...rankResource,
+        ...overrides,
+      },
+    ],
+  });
+}
+
+describe("defineDataApi uniqueBy", () => {
+  it("keeps implicit id when id is a returned column (0.5.0 host)", () => {
+    const api = registry();
+    expect(api.resourceByName.get("owned-items")?.uniqueBy).toBe("id");
+  });
+
+  it("rejects a resource without id in columns and without uniqueBy", () => {
+    expect(() =>
+      defineDataApi({
+        resources: [
+          {
+            name: "rank-items",
+            relation: "rank_items",
+            columns: ["title", "rank"],
+            ownerColumn: "user_id",
+            orderBy: "rank",
+          },
+        ],
+      }),
+    ).toThrow(/uniqueBy/);
+  });
+
+  it("rejects a dangerous uniqueBy identifier", () => {
+    expect(() =>
+      rankRegistry({ uniqueBy: "item_key;drop table app.rank_items" }),
+    ).toThrow(DataApiError);
+    expect(() => rankRegistry({ uniqueBy: 'item_key","rank' })).toThrow(DataApiError);
+  });
+});
+
+describe("listResource unique pagination", () => {
+  it("pages stably when id is not returned and uniqueBy is explicit", async () => {
+    const db = await seedRankItems();
+    const api = rankRegistry({ orderDirection: "asc" });
+    const page1 = await listResource(api, db, {
+      resource: "rank-items",
+      user: alice,
+      limit: 2,
+      offset: 0,
+    });
+    const page2 = await listResource(api, db, {
+      resource: "rank-items",
+      user: alice,
+      limit: 2,
+      offset: 2,
+    });
+    const page3 = await listResource(api, db, {
+      resource: "rank-items",
+      user: alice,
+      limit: 2,
+      offset: 4,
+    });
+    const titles = [...page1.items, ...page2.items, ...page3.items].map((row) => row.title);
+    expect(titles).toEqual(["alice-k1", "alice-k2", "alice-k3", "alice-k4", "alice-k5"]);
+    expect(new Set(titles).size).toBe(5);
+    expect(page1.items.every((row) => Object.keys(row).sort().join() === "rank,title")).toBe(true);
+    expect(page1.items.some((row) => "item_key" in row)).toBe(false);
+  });
+
+  it("repeats the same pages on frozen data without skip or duplicate", async () => {
+    const db = await seedRankItems();
+    const api = rankRegistry({ orderDirection: "asc" });
+    const collect = async () => {
+      const titles: unknown[] = [];
+      for (const offset of [0, 2, 4]) {
+        const page = await listResource(api, db, {
+          resource: "rank-items",
+          user: alice,
+          limit: 2,
+          offset,
+        });
+        titles.push(...page.items.map((row) => row.title));
+      }
+      return titles;
+    };
+    const first = await collect();
+    const second = await collect();
+    expect(first).toEqual(second);
+    expect(first).toEqual(["alice-k1", "alice-k2", "alice-k3", "alice-k4", "alice-k5"]);
+  });
+
+  it("honors DESC including when the unique key is the primary orderBy", async () => {
+    const db = await seedRankItems();
+    const desc = rankRegistry({ orderDirection: "desc" });
+    const descPage = await listResource(desc, db, {
+      resource: "rank-items",
+      user: alice,
+      limit: 5,
+    });
+    expect(descPage.items.map((row) => row.title)).toEqual([
+      "alice-k5",
+      "alice-k4",
+      "alice-k3",
+      "alice-k2",
+      "alice-k1",
+    ]);
+
+    const byKey = rankRegistry({ orderBy: "item_key", uniqueBy: "item_key", orderDirection: "asc" });
+    const keyed = await listResource(byKey, db, { resource: "rank-items", user: alice, limit: 5 });
+    expect(keyed.items.map((row) => row.title)).toEqual([
+      "alice-k1",
+      "alice-k2",
+      "alice-k3",
+      "alice-k4",
+      "alice-k5",
+    ]);
+    expect(keyed.items.some((row) => "item_key" in row)).toBe(false);
+  });
+
+  it("keeps two-user isolation on the uniqueBy resource", async () => {
+    const db = await seedRankItems();
+    const api = rankRegistry();
+    const aliceRows = await listResource(api, db, { resource: "rank-items", user: alice, limit: 10 });
+    const bobRows = await listResource(api, db, { resource: "rank-items", user: bob, limit: 10 });
+    expect(aliceRows.items).toHaveLength(5);
+    expect(bobRows.items.map((row) => row.title)).toEqual(["bob-k1"]);
+    expect(aliceRows.items.some((row) => String(row.title).startsWith("bob-"))).toBe(false);
+  });
+});

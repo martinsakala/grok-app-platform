@@ -8,7 +8,12 @@ export type DataApiOrderDirection = "asc" | "desc";
 
 /**
  * Host-declared read-only resource. Schema is always `api`.
- * `ownerColumn` is required — 0.5.0 has no anonymous or unscoped resources.
+ * `ownerColumn` is required — 0.5.x has no anonymous or unscoped resources.
+ *
+ * `uniqueBy` is the column that makes `ORDER BY` unique **within one owner**.
+ * It is used in `ORDER BY` even when it is not returned. The application is
+ * responsible for that uniqueness on the published view; the name `id` does
+ * not prove it. Offset pagination is not a consistent snapshot.
  */
 export type DataApiResource = {
   name: string;
@@ -17,6 +22,7 @@ export type DataApiResource = {
   ownerColumn: string;
   orderBy: string;
   orderDirection?: DataApiOrderDirection;
+  uniqueBy?: string;
 };
 
 export type DataApiConfig = {
@@ -30,6 +36,7 @@ export type DefinedDataApiResource = {
   ownerColumn: string;
   orderBy: string;
   orderDirection: DataApiOrderDirection;
+  uniqueBy: string;
 };
 
 export type DataApiRegistry = {

@@ -19,6 +19,27 @@ function unique(values: readonly string[], label: string): readonly string[] {
   return values;
 }
 
+/**
+ * Unique sort key, independent of returned `columns`.
+ *
+ * Compatibility (0.5.0 hosts): if `uniqueBy` is omitted and `id` is among
+ * `columns`, `id` is the unique key. Any other omitted configuration is
+ * rejected — 0.5.0 would have paginated with a non-unique ORDER BY.
+ */
+function resolveUniqueBy(
+  resource: DataApiResource,
+  name: string,
+  columns: readonly string[],
+): string {
+  if (resource.uniqueBy !== undefined && resource.uniqueBy !== null && resource.uniqueBy !== "") {
+    return assertSqlIdent(resource.uniqueBy, "uniqueBy");
+  }
+  if (columns.includes("id")) {
+    return "id";
+  }
+  throw new Error(`data API resource ${name} must declare uniqueBy`);
+}
+
 function defineResource(resource: DataApiResource): DefinedDataApiResource {
   if (!resource || typeof resource !== "object") {
     throw new Error("data API resource is required");
@@ -38,6 +59,7 @@ function defineResource(resource: DataApiResource): DefinedDataApiResource {
     "column",
   );
   const orderBy = assertSqlIdent(resource.orderBy, "orderBy");
+  const uniqueBy = resolveUniqueBy(resource, name, columns);
   const orderDirection: DataApiOrderDirection =
     resource.orderDirection === "desc" ? "desc" : resource.orderDirection === "asc" ? "asc" : "asc";
   if (resource.orderDirection && resource.orderDirection !== "asc" && resource.orderDirection !== "desc") {
@@ -50,6 +72,7 @@ function defineResource(resource: DataApiResource): DefinedDataApiResource {
     ownerColumn,
     orderBy,
     orderDirection,
+    uniqueBy,
   });
 }
 

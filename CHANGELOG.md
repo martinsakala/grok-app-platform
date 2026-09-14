@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+- Deterministic read-only list order: `uniqueBy` is a sort key independent of returned `columns`. `ORDER BY` uses `orderBy` then `uniqueBy` (once, when they differ). The unique column is not selected unless it is also in `columns`.
+- Compatibility: if `uniqueBy` is omitted and `id` is among `columns`, `id` remains the unique key (existing 0.5.0 host registrations keep working). Other incomplete configurations are rejected at `defineDataApi`. That is a fail-closed fix of previously unstable pagination, not a new product feature.
+- Uniqueness is an **application invariant** on the published view, at least within one owner. The column name `id` does not prove it.
+- Unique `ORDER BY` is not a consistent snapshot: OFFSET pages can still skip or repeat rows when rows are inserted, updated, or deleted concurrently. No cursor pagination, no generic filter language, no auth changes, no historical migration edits.
+- `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion` remains 2. Hosts that already return `id` need no code change. Hosts that listed resources without `id` and without `uniqueBy` must add `uniqueBy` (those never had the documented unique order).
+
 ## 0.5.0
 - Added a **read-only data API** (`src/data-api`): hosts register named resources over schema `api`; `listResource` returns an explicit column list for the verified session user.
 - Positive allowlist only. Schema `api` is required but not sufficient. `public`, `private`, and `app` are never published. Auth denylist remains defense-in-depth.

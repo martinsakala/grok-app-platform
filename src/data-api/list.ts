@@ -57,9 +57,19 @@ function wrapQueryError(error: unknown): never {
   });
 }
 
+function orderBySql(orderBy: string, uniqueBy: string, directionSql: string): string {
+  const primary = `${quoteIdent(orderBy)} ${directionSql}`;
+  if (uniqueBy === orderBy) return primary;
+  return `${primary}, ${quoteIdent(uniqueBy)} ${directionSql}`;
+}
+
 /**
  * Read-only list. Always filters by the verified session user on `ownerColumn`.
  * Client `user_id` / schema / SQL fields on the input are ignored.
+ *
+ * ORDER BY uses `orderBy` then `uniqueBy` (unless they are the same column).
+ * `uniqueBy` is not selected unless it is also in `columns`. Offset pages are
+ * unique for a frozen result set; concurrent writes can still skip or repeat.
  */
 export async function listResource(
   registry: DataApiRegistry,
@@ -74,16 +84,12 @@ export async function listResource(
   const selectList = resource.columns.map((column) => quoteIdent(column)).join(", ");
   const from = qualifyApiRelation(resource.relation);
   const owner = quoteIdent(resource.ownerColumn);
-  const orderBy = quoteIdent(resource.orderBy);
   const direction = resource.orderDirection === "desc" ? "DESC" : "ASC";
-  const tiebreaker =
-    resource.columns.includes("id") && resource.orderBy !== "id"
-      ? `, ${quoteIdent("id")} ${direction}`
-      : "";
+  const orderSql = orderBySql(resource.orderBy, resource.uniqueBy, direction);
 
   const sql =
     `select ${selectList} from ${from} where ${owner} = $1 ` +
-    `order by ${orderBy} ${direction}${tiebreaker} limit $2 offset $3`;
+    `order by ${orderSql} limit $2 offset $3`;
 
   try {
     const result = await db.query<Record<string, unknown>>(sql, [user.id, limit, offset]);

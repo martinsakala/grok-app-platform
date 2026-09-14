@@ -94,6 +94,7 @@
 22. Data API extension point (`src/data-api`):
 
     * Positive allowlist of named resources over schema `api` only. Schema `api` is not an automatic publish surface.
-    * Hosts call `defineDataApi` + `listResource`. Every 0.5.0 resource requires `ownerColumn`; the server filters by the verified session user.
+    * Hosts call `defineDataApi` + `listResource`. Every resource requires `ownerColumn`; the server filters by the verified session user.
+    * `uniqueBy` (implicit `id` when `id` is returned) makes `ORDER BY` unique within one owner. It need not be in `columns`. The application owns that uniqueness; OFFSET is not a snapshot.
     * HTTP routes are not part of the platform; host apps create thin GET adapters.
     * `public`, `private`, and `app` are never published. Auth denylist is defense-in-depth.

@@ -8,7 +8,21 @@
 * A normal platform upgrade must not change application files under `/app/**`.
 * After upgrade, verify `platform/VERSION`, build, tests, and `git diff -- app/`.
 
+## 0.5.1
+
+`breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion=2`.
+
+Unique list order. **Subtree pull alone does not change application behavior** for hosts that already return `id` (implicit `uniqueBy`). Auth, query traffic, and migrations are unchanged.
+
+1. `git subtree pull --prefix=platform platform-upstream main --squash`.
+2. Optional: set `uniqueBy` explicitly even when `id` is returned.
+3. If a resource does **not** return `id`, add `uniqueBy` to the registry (0.5.0 would have paginated unstably). Do not edit historical SQL.
+4. Keep the host Nitro **closeBundle** PGlite wasm/data copy; do **not** replace `nitro({ hooks.compiled })`.
+
+OFFSET pagination is unique for a frozen row set. Concurrent writes can still skip or repeat rows. This is not cursor pagination.
+
 ## 0.5.0
+
 
 `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion=2`.
 
