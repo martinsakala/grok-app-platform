@@ -10,6 +10,39 @@ never lives here.
 
 Current version: see [`VERSION`](VERSION) and [`CHANGELOG.md`](CHANGELOG.md).
 
+## The three things, in plain words
+
+There are exactly three things, and they are not copies of each other:
+
+| Thing | Where | What it is | Can you run it? |
+| --- | --- | --- | --- |
+| **Platform** (this repo) | GitHub `grok-app-platform`, public | A **library**: identity, database, migrations, read-only data API. No pages, no login screen, no app. | No |
+| **mother-app** | GitHub `mother-app`, private | The **source code of one application** that uses the library. Contains a copy of the library under `/platform`, plus pages, login, config and Grok's own scaffold. | Yes |
+| **mother-app, published** | Grok Build project → `mother-app.grok.me` | The **running** mother-app, built from that source. Other apps start as a **Remix** of it. | It is running |
+
+```
+GitHub grok-app-platform (library)
+        │  git subtree pull
+        ▼
+Grok Build project "mother-app"      ──Publish──▶   mother-app.grok.me
+  /platform  copy of the library                        │
+  /app       the application                            │  Remix
+  Grok chrome (src/lib, vite.config)                    ▼
+        │  git push                              a new app project
+        ▼
+GitHub mother-app (private source copy)
+```
+
+Analogy: the platform is `express`; mother-app is an application written in
+Express. The library changes in one place, every app pulls the new version.
+
+Why two repositories and not one: every app pulls `/platform` from this repo
+with `git subtree`. If the application lived here too, each pull would drag a
+whole app into every other app. The library is public; the application is not.
+
+Why mother-app has a GitHub repo at all: the Grok Build sandbox is not durable
+storage. That repo is the only copy of the application source you own.
+
 ## Purpose
 
 Every Grok Build app that needs sign-in and a database has to solve the same
@@ -64,9 +97,17 @@ public    Better Auth tables ("user", "session", ...)           Grok/Better Auth
 authorization authority. Identity comes only from the verified server-side
 session. `requireUser` takes no user id argument on purpose.
 
+## How new features reach existing apps
+
+Remix is a one-time fork. An app remixed from mother-app does **not** receive
+anything added to mother-app later. The only update channel is this library:
+`git subtree pull` in each app. Therefore: anything reusable across apps goes
+**into the platform** and is released as a version; mother-app stays thin
+(Grok chrome plus thin adapters).
+
 ## Where to start
 
-- New application on this platform: [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md)
+- New application: **Remix** `mother-app.grok.me` in Grok Build, then follow [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md)
 - Rules for coding agents working in a host repository: [`docs/host/AGENTS.project.md`](docs/host/AGENTS.project.md)
 - Upgrading an existing application: [`docs/UPGRADING.md`](docs/UPGRADING.md) and [`compatibility.json`](compatibility.json)
 - Architecture and invariants: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`AGENTS.md`](AGENTS.md)

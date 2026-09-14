@@ -7,8 +7,15 @@ override the generic "ship a demo-quality product" defaults wherever they confli
 ## What this project is
 
 An application built on the shared platform layer in `/platform`
-(upstream: `martinsakala/grok-app-platform`). Sign-in and a durable database
-are **on**. Domain scope is defined by the user in chat, never assumed.
+(upstream: `martinsakala/grok-app-platform`). It is either **mother-app**
+itself (the clean base others Remix) or a Remix of it. Sign-in and a durable
+database are **on**. Domain scope is defined by the user in chat, never assumed.
+
+Remix is a one-time fork: a remixed app never receives later mother-app
+changes. The only update channel is the platform via `git subtree pull`.
+Therefore anything reusable across applications belongs **in the platform**,
+released as a version. mother-app stays thin: Grok chrome plus thin adapters,
+no test entities, no demo content.
 
 ## Never do this
 

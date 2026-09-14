@@ -1,31 +1,46 @@
 # Getting started: a new application on the platform
 
-This is the end-to-end recipe. The per-version details it consolidates live in
-`docs/UPGRADING.md`, `docs/AUTH.md`, `docs/DATABASE.md` and `docs/HOST_LAYOUT.md`.
+Read the "three things" section of the root `README.md` first: **platform**
+(this library), **mother-app** (one application using it, source on GitHub),
+**mother-app published** (`mother-app.grok.me`, the thing you Remix).
 
-Verified reference host (private): `martinsakala/grok-app-platform-integration-test`.
-It is a **test** host and carries test entities and self-checks; do not copy it
-blindly. Use the template repository instead when one exists for your
-platform version.
+## Path A: Remix mother-app (the normal way)
 
-## 0. Prerequisites
+1. Open `https://mother-app.grok.me`, use the **Created with Grok → Remix**
+   pill. Grok Build creates a **new project** with a copy of the whole source:
+   `/app`, `/platform`, Grok chrome, `AGENTS.project.md`, `.grok/app-env.json`,
+   `migrations/0001_auth.sql`.
+2. In the new project's chat, tell the agent what the app is. `AGENTS.project.md`
+   already forbids building anything you did not ask for.
+3. Rename the app: `app/app-config.ts` (`name`, `version`).
+4. Add domain tables as `app/migrations/000N_*.sql`, views as
+   `app/migrations-api/000N_*.sql`, register resources in `app/data-api.ts`,
+   pass the SQL into `runMigrations` in `app/db.server.ts` via Vite `?raw`.
+5. Verify in preview (section 4 below), then **Publish**. The new app gets its
+   own Neon database. Preview data never reaches it.
+6. Add the upstream remote once, so the agent can upgrade the platform later:
 
-- A Grok Build project. Grok generates the host chrome (`src/lib/auth/**`,
-  `src/lib/db.ts`, `vite.config.ts`, `startup.sh`, `.grok/**`). Do not rewrite
-  those files.
-- Decide up front: does the app need sign-in and durable data? This platform
-  assumes **yes** to both. For a static app you do not need it.
+   ```bash
+   git remote add platform-upstream https://github.com/martinsakala/grok-app-platform.git
+   ```
 
-## 1. Pull the platform
+Remix is a one-time fork. Later changes in mother-app do not flow into your app.
+Platform versions do, via `git subtree pull` (section 6).
+
+## Path B: bare Grok scaffold (only when Remix is not available)
+
+Same result, assembled by hand. Grok generates the host chrome
+(`src/lib/auth/**`, `src/lib/db.ts`, `vite.config.ts`, `startup.sh`, `.grok/**`);
+do not rewrite those files.
+
+### B1. Pull the platform
 
 ```bash
 git remote add platform-upstream https://github.com/martinsakala/grok-app-platform.git
 git subtree add --prefix=platform platform-upstream main --squash
 ```
 
-Check `platform/VERSION` and `platform/compatibility.json`.
-
-## 2. Host glue (root, host-owned)
+### B2. Host glue (root, host-owned)
 
 1. `vite.config.ts`: `tanstackStart({ srcDirectory: "app" })`, alias `@/*` → `/app/*`.
    Keep `nitro({ preset: "vercel", serverDir: "./server" })` **without** overriding
@@ -37,26 +52,27 @@ Check `platform/VERSION` and `platform/compatibility.json`.
    `VITE_AUTH_ENABLED` so sign-in is on.
 3. `cp migrations/auth/0001_auth.sql migrations/0001_auth.sql` (Grok's canonical
    Better Auth schema; never edit it).
-4. Put project rules in `AGENTS.project.md` (start from
-   `platform/docs/host/AGENTS.project.md`). Grok's own `AGENTS.md` treats it with
-   the same priority.
+4. Copy `platform/docs/host/AGENTS.project.md` to the root as `AGENTS.project.md`.
+   Grok's own `AGENTS.md` treats it with the same priority.
 
-## 3. Application files (`/app`, application-owned)
+### B3. Application files (`/app`, application-owned)
 
 | File | Role |
 | --- | --- |
 | `app/app-config.ts` | `defineAppConfig({ name, version, dataApiVersion })` |
 | `app/db.server.ts` | `setPgliteFactory(() => getPglite())` at module top, then `ensureAppDatabase()` that calls `runMigrations({ applicationMigrations, apiMigrations })` once |
 | `app/auth.server.ts` | binds Grok `auth.api.getSession` to platform `createAuthSessionSource`; exports `requireUser`, `getCurrentUser`, `getCurrentSession` |
-| `app/data-api.ts` | `defineDataApi({ resources: [...] })` — only if you publish read-only lists |
+| `app/data-api.ts` | `defineDataApi({ resources: [...] })` |
 | `app/migrations/000N_*.sql` | domain tables in schema `app` |
 | `app/migrations-api/000N_*.sql` | `CREATE VIEW api.<name> AS SELECT <explicit columns> FROM app.<table>` |
 | `app/routes/api/health.ts`, `version.ts` | thin adapters over `getHealthResponse` / `getVersionResponse` |
 | `app/routes/api/auth/$.ts` | one-line forward to Grok `auth.handler` (relative import of `src/lib/auth/server`) |
-| `app/routes/api/data/$resource.ts` | optional thin GET adapter: `requireUser` then `listResource` |
+| `app/routes/api/data/$resource.ts` | thin GET adapter: `requireUser` then `listResource` |
 | `app/routes/login.tsx` | application-owned sign-in UI using Grok `signIn("grok-google")` |
 
-Rules that matter most:
+The mother-app repository is the reference for every one of these files.
+
+## Rules that matter most (both paths)
 
 - Call `setPgliteFactory` **before** the first `getDatabase()` / `runMigrations()`
   / `getAuthDiagnostics()`; otherwise preview opens a second PGlite and Better
@@ -68,6 +84,7 @@ Rules that matter most:
 - Import `platform/src/database` and `platform/src/auth` only from server-only
   code (`*.server.ts`, route `server.handlers`, `createServerFn` handlers).
 - Historical migration files are immutable; a change is a new file.
+- Reusable across apps? It belongs in the platform, not in your app.
 
 ## 4. Verify in preview
 
@@ -79,7 +96,8 @@ GET /api/data/<resource> (signed out)  → 401
 ```
 
 Sign in with Google in the preview, create a row, confirm a second account does
-not see it.
+not see it. In a fresh clone `npm run typecheck` fails until `npm run build` or
+`dev` has generated `app/routeTree.gen.ts` (git-ignored); that is not a bug.
 
 ## 5. Publish and verify production
 
@@ -96,7 +114,7 @@ Grok provisions Neon and injects `DATABASE_URL` (pooled) plus an unpooled URL.
 Platform migrations run at the first request after deploy, serialized by the
 advisory lock. Preview data never reaches production.
 
-## 6. Upgrading later
+## 6. Upgrading the platform later
 
 ```bash
 git subtree pull --prefix=platform platform-upstream main --squash
