@@ -74,6 +74,33 @@ When a host **does** still have subtree metadata, `git subtree pull` remains
 the documented path for that host.
 
 
+## 0.15.0
+
+`breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`,
+`appContractVersion=7` (unchanged).
+
+Machine-readable capability registry so the GUI and an LLM share one API
+description. No new SQL. Do not edit historical migrations. Hosts that already
+mount the catch-all get `/registry`, `/openapi.json`, and `/llms.txt` without
+code changes.
+
+1. Upgrade `/platform` (subtree pull **or** snapshot overlay above) to 0.15.0.
+   Confirm `platform/VERSION` is `0.15.0` and `/platform` has 0 diffs against
+   the release SHA.
+2. Optional: mount `ApiDocsPage` at `/admin/api` (member+). Recommended as a
+   mother-app default so a human can browse the same list an LLM reads.
+3. Optional: pass `registryPublic: false` if discovery should not be anonymous.
+   Default is public (description, not data). Optional `settingsKeys` advertises
+   known setting names in the registry (no values).
+4. Keep `setPgliteFactory` and the Nitro **closeBundle** PGlite copy; do
+   **not** replace `nitro({ hooks.compiled })`.
+
+A new data resource or mutation is a registration in `app/data-api.ts` /
+`app/mutations.ts`. The registry is generated; do not hand-describe endpoints.
+See `docs/REGISTRY.md`. Setting key for export remains
+`platform.export.max-rows` (lowercase).
+
+
 ## 0.14.0
 
 `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`,

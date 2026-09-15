@@ -63,14 +63,15 @@ domain layer on top of an unchanged, upgradable platform.
 | `auth` | `platform/src/auth` | `requireUser` / `getCurrentUser` / `getCurrentSession` over the Grok Better Auth session, `assignOwner`, `ownerIdFromSession`. No OAuth implemented here. |
 | `data-api` | `platform/src/data-api` | `defineDataApi` + `listResource` + `exportResource`: read-only, allowlisted, owner-scoped list/export over views in schema `api`; offset and signed keyset `cursor`; CSV / NDJSON export |
 | `logging` | `platform/src/logging` | `createLogger` / `logError`: one JSON line, secret keys and connection strings redacted |
-| `http` | `platform/src/http` | `createPlatformHandler`: `/api/platform/health`, `/version`, `/data/:resource` (+ `/export`, `GET /data`), plus `/me`, `/admin/*`, `/api-keys`, `/settings`, `/admin/audit`, `/design` (import / export / gallery), `/mutations` |
+| `http` | `platform/src/http` | `createPlatformHandler`: `/api/platform/health`, `/version`, `/registry`, `/openapi.json`, `/llms.txt`, `/data/:resource` (+ `/export`, `GET /data`), plus `/me`, `/admin/*`, `/api-keys`, `/settings`, `/admin/audit`, `/design` (import / export / gallery), `/mutations` |
 | `access` | `platform/src/access` | roles, first-user-as-owner bootstrap, allowlist policy |
 | `api-keys` | `platform/src/api-keys` | hashed `gk_` keys; plaintext once; data scoped to the key owner |
 | `settings` | `platform/src/settings` | JSON documents in `private.settings`; `platform.*` owner-only writes |
 | `audit` | `platform/src/audit` | append-only `private.audit_log`; admin cursor list; no retention job |
-| `ui` | `platform/src/ui` | typed `createPlatformClient`, AppShell / AdminLayout, admin pages (incl. Design, Mutations, Data), `--pf-*` tokens. Host mounts; no router in the platform |
+| `ui` | `platform/src/ui` | typed `createPlatformClient`, AppShell / AdminLayout, admin pages (incl. API docs, Design, Mutations, Data), `--pf-*` tokens. Host mounts; no router in the platform |
 | `design` | `platform/src/design` | `design.md` parser, `--pf-*` CSS generator, runtime document/form overlay, gallery presets, `DESIGN_PROMPT`. Voice never becomes CSS |
 | `mutations` | `platform/src/mutations` | `defineMutations` + `POST /mutations/:name`: transactional host writes, same contract for GUI and API keys |
+| `registry` | `platform/src/registry` | `buildRegistry` / `buildOpenApi` / `buildLlmsTxt`: one capability list for GUI and LLM |
 
 Server APIs stay server-only. Login UI stays in the application. HTTP under
 `/api/platform` is served by `createPlatformHandler`; hosts mount one catch-all
@@ -86,8 +87,27 @@ file, not the database). 0.12.0 adds **keyset `cursor` pagination** on
 idempotency, callable from `MutationsPage` or an API key.
 0.14.0 adds **data export**: `GET /api/platform/data/:resource/export`
 (CSV / NDJSON, same owner filter as list) and optional `DataResourcesPage`.
+0.15.0 adds a **capability registry**: `GET /api/platform/registry`,
+OpenAPI 3.1, and `llms.txt` so an LLM with an API key can discover the same
+API the GUI uses (see Headless below).
 Hosts that landed `/platform` as a snapshot (no subtree
 metadata) copy the upstream tree instead of `git subtree pull` — `docs/UPGRADING.md`.
+
+## Headless: GUI and LLM share one implementation
+
+The platform is a library with an HTTP API. Pages call `createPlatformClient`.
+An LLM with `Authorization: Bearer gk_…` calls the same routes.
+
+1. Create a key at `/admin/api-keys` (plaintext once).
+2. Read `GET /api/platform/llms.txt` (what the app is, three curl examples,
+   invariants) then `GET /api/platform/registry` or `/openapi.json`.
+3. List owner-scoped resources (`?cursor=`), POST mutations (`Idempotency-Key`),
+   export CSV/NDJSON. Client `user_id` is never identity.
+
+Do not hand-describe endpoints in the host. Register a resource or mutation;
+the registry is generated. The JSON registry is the source for a future MCP
+server — it is not MCP itself. Optional UI: `ApiDocsPage` at `/admin/api`.
+Contract: [`docs/REGISTRY.md`](docs/REGISTRY.md).
 
 ## How it works
 
@@ -134,7 +154,7 @@ anything added to mother-app later. The only update channel is this library:
 - Rules for coding agents working in a host repository: [`docs/host/AGENTS.project.md`](docs/host/AGENTS.project.md)
 - Upgrading an existing application: [`docs/UPGRADING.md`](docs/UPGRADING.md) and [`compatibility.json`](compatibility.json)
 - Architecture and invariants: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`AGENTS.md`](AGENTS.md)
-- Module contracts: [`docs/AUTH.md`](docs/AUTH.md), [`docs/ACCESS.md`](docs/ACCESS.md), [`docs/DATABASE.md`](docs/DATABASE.md), [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md), [`docs/DATA_API.md`](docs/DATA_API.md), [`docs/HTTP.md`](docs/HTTP.md), [`docs/LOGGING.md`](docs/LOGGING.md), [`docs/HOST_LAYOUT.md`](docs/HOST_LAYOUT.md), [`docs/UI.md`](docs/UI.md), [`docs/DESIGN.md`](docs/DESIGN.md), [`docs/MUTATIONS.md`](docs/MUTATIONS.md)
+- Module contracts: [`docs/AUTH.md`](docs/AUTH.md), [`docs/ACCESS.md`](docs/ACCESS.md), [`docs/DATABASE.md`](docs/DATABASE.md), [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md), [`docs/DATA_API.md`](docs/DATA_API.md), [`docs/HTTP.md`](docs/HTTP.md), [`docs/LOGGING.md`](docs/LOGGING.md), [`docs/HOST_LAYOUT.md`](docs/HOST_LAYOUT.md), [`docs/UI.md`](docs/UI.md), [`docs/DESIGN.md`](docs/DESIGN.md), [`docs/MUTATIONS.md`](docs/MUTATIONS.md), [`docs/REGISTRY.md`](docs/REGISTRY.md)
 
 ## What it does not do (yet)
 

@@ -89,6 +89,11 @@ TanStack `srcDirectory: "app"`, alias `@/*` → `/app/*`. Import Grok chrome fro
 - Mount `DataResourcesPage` at `/admin/data` (0.14.0, recommended). Export
   is the same owner-scoped read as `listResource`. Do not add a parallel
   CSV dump that bypasses the data API.
+- Mount `ApiDocsPage` at `/admin/api` (0.15.0, recommended). Discovery is
+  `GET /api/platform/registry` (and `/openapi.json`, `/llms.txt`). A new
+  capability is a registration in `app/data-api.ts` or `app/mutations.ts`;
+  the registry is generated. Do not hand-describe endpoints. Do not implement
+  MCP in the host — the registry is the source for a future MCP adapter.
 
 ## Before reporting done
 

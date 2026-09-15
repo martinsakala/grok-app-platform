@@ -2,7 +2,9 @@
 
 Host-registered **writes** with the same contract for the admin GUI and for an
 LLM holding an API key. Nothing is writable until the host lists it in
-`defineMutations`. Reads stay on the data API.
+`defineMutations`. Reads stay on the data API. 0.15.0 lists each mutation in
+`GET /api/platform/registry` with JSON Schema converted from this input format
+(`docs/REGISTRY.md`). Do not duplicate that description in the host.
 
 ## Host registration
 

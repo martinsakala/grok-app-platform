@@ -65,6 +65,7 @@ git subtree add --prefix=platform platform-upstream main --squash
 | `app/data-api.ts` | `defineDataApi({ resources: [...] })` |
 | `app/mutations.ts` | `defineMutations({ mutations: [] })` (0.13.0); pass into the handler |
 | `app/routes/admin/data.tsx` | optional 0.14.0 `DataResourcesPage` (recommended mother-app default) |
+| `app/routes/admin/api.tsx` | optional 0.15.0 `ApiDocsPage` (recommended mother-app default) |
 | `app/migrations/000N_*.sql` | domain tables in schema `app` |
 | `app/migrations-api/000N_*.sql` | `CREATE VIEW api.<name> AS SELECT <explicit columns> FROM app.<table>` |
 | `app/routes/api/platform/$.ts` | catch-all → `createPlatformHandler` |
@@ -100,6 +101,8 @@ GET /api/auth/get-session (signed out) → null
 GET /api/data/<resource> (signed out)  → 401
 GET /api/platform/data/<resource> (signed out) → 401
 GET /api/platform/nope → 404 {code:"not_found"}
+GET /api/platform/registry → 200 capabilities JSON (public)
+GET /api/platform/llms.txt → Markdown; no secrets
 ```
 
 Sign in with Google in the preview, create a row, confirm a second account does

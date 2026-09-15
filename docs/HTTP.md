@@ -13,7 +13,9 @@ owner `PUT`/`DELETE /design`. 0.11.0 adds owner `POST /design/import`,
 keyset; `invalid_cursor` is 400). 0.13.0 adds `GET /mutations` and
 `POST /mutations/:name` (optional handler `mutations`). 0.14.0 adds
 `GET /data` (registry) and `GET /data/:resource/export` (CSV / NDJSON stream;
-optional handler `exportMaxRows`).
+optional handler `exportMaxRows`). 0.15.0 adds public `GET /registry`,
+`GET /openapi.json`, and `GET /llms.txt` (optional `registryPublic: false`
+makes them principal-only). See `docs/REGISTRY.md`.
 
 ## Prefix
 
@@ -25,6 +27,9 @@ the host rewrites those paths onto the same handler.
 | --- | --- | --- |
 | `GET` | `/api/platform/health` | public |
 | `GET` | `/api/platform/version` | public |
+| `GET` | `/api/platform/registry` | public (principal if `registryPublic: false`). `ETag` / `304`. `Cache-Control: public, max-age=300` when public |
+| `GET` | `/api/platform/openapi.json` | same as `/registry` |
+| `GET` | `/api/platform/llms.txt` | same as `/registry`. `text/plain` |
 | `GET` | `/api/platform/data/:resource` | principal (session or `gk_` key). Query `limit`, `offset`, `cursor` |
 | `GET` | `/api/platform/data/:resource/export` | principal. Query `format=csv\|json`, `limit`. Stream. `X-Export-Truncated` when capped |
 | `GET` | `/api/platform/data` | principal. `{ resources: [{ name, columns, orderBy }] }` |
@@ -49,7 +54,9 @@ the host rewrites those paths onto the same handler.
 Unknown **path** → `404 { "error": "Not Found", "code": "not_found" }`.
 Known path, wrong method → `405 { "error": "Method Not Allowed" }` with `Allow`.
 Invalid JSON or oversize body (32 KiB) → `400 { "error": "…", "code": "bad_request" }`.
-Every JSON response sends `cache-control: no-store`.
+JSON responses send `cache-control: no-store`, except `/registry`,
+`/openapi.json`, and `/llms.txt` when they are public (`public, max-age=300`
+plus `ETag`).
 
 ## Handler
 
@@ -66,6 +73,8 @@ export const handlePlatform = createPlatformHandler({
   designMarkdown, // optional raw design.md; tokens derived when designTokens omitted
   mutations,      // optional defineMutations({ mutations }); omit → /mutations is 404
   exportMaxRows,  // optional hard cap for data export; default 100000
+  registryPublic, // optional; default true. false → /registry, /openapi.json, /llms.txt need a principal
+  settingsKeys,   // optional advertised setting names in the registry (no values)
 });
 ```
 
@@ -92,6 +101,11 @@ invalid_input` otherwise). Body is a `ReadableStream`. Headers:
 logged; they never include SQL. Setting `platform.export.max-rows` may
 only lower `exportMaxRows`.
 
+Discovery (`docs/REGISTRY.md`): `/registry` is `PlatformRegistry` JSON.
+`/openapi.json` is OpenAPI 3.1 generated from it (`operationId` = capability
+id). `/llms.txt` is short Markdown for a model. All three omit SQL
+identifiers, `ownerEmails`, and secrets.
+
 ## Errors
 
 | Thrown | Status | Body |
@@ -110,7 +124,7 @@ only lower `exportMaxRows`.
 | anything else | 500 | `{ "error": "Internal Server Error" }` + `logError` |
 
 500 bodies never include SQL, driver text, or connection strings. Unknown
-resources are `DataApiError` `404 unknown_resource`. Access routes: see `docs/ACCESS.md`. Settings: `docs/SETTINGS.md`. Audit: `docs/AUDIT.md`. Design: `docs/DESIGN.md`. Mutations: `docs/MUTATIONS.md`. Data export: `docs/DATA_API.md`.
+resources are `DataApiError` `404 unknown_resource`. Access routes: see `docs/ACCESS.md`. Settings: `docs/SETTINGS.md`. Audit: `docs/AUDIT.md`. Design: `docs/DESIGN.md`. Mutations: `docs/MUTATIONS.md`. Data export: `docs/DATA_API.md`. Registry: `docs/REGISTRY.md`.
 
 ## Host wiring
 

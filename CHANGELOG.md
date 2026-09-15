@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.0
+- **Capability registry** (`src/registry`): `buildRegistry` describes the deployment for GUI and LLM from the same handler, data-API, and mutation registries. JSON `{ platformVersion, appContractVersion, application, auth, capabilities[] }`. Each capability has `id`, `kind` (`read|write|admin|design|settings|audit|export`), `method`, `path`, `roles`, `description`, JSON Schema draft 2020-12 `input`, `output`, `pagination: cursor` where it applies. Per-resource list/export and per-mutation POST (validator format → JSON Schema). No secrets, no SQL identifiers (`relation` / owner column / `uniqueBy`), no `ownerEmails`.
+- **HTTP:** public `GET /api/platform/registry`, `GET /openapi.json` (OpenAPI 3.1, `operationId` = capability id, `servers: [{url:"/"}]`, Bearer `gk_` + session cookie), `GET /llms.txt` (short Markdown: how to get a key, three curl examples, invariants). `ETag` / `304`, `Cache-Control: public, max-age=300`. `createPlatformHandler({ registryPublic: false })` makes all three principal-only. Optional `settingsKeys` (names only).
+- **UI:** `ApiDocsPage` (member+), client `getRegistry()`, `DEFAULT_ADMIN_NAV` item API → `/admin/api`. Copy curl with `$API_KEY`.
+- Host: `breaking=false`, `requiresAppChanges=false`, `requiresDatabaseMigration=false`, `appContractVersion` remains **7**. Optional `/admin/api` with `ApiDocsPage` (recommended for mother-app). No new SQL. No historical migration edits.
+
 ## 0.14.0
 - **Data export.** `exportResource` streams owner-scoped rows via `listResource` keyset pages (`MAX_PAGE_SIZE`). CSV (RFC 4180, LF, no BOM, null empty, Date ISO, objects JSON, formula-injection prefix `'` on `= + - @`) and NDJSON (`format=json`). Cap default 100000; `createPlatformHandler({ exportMaxRows })`; setting `platform.export.max-rows` (lowercase; not `maxRows`) may only lower it. Cap hit → stream stops, `X-Export-Truncated: true`. Filename `<resource>-<YYYYMMDD-HHmmss>.csv|ndjson`.
 - **HTTP:** `GET /api/platform/data/:resource/export?format=csv|json&limit=N` (session or API key). `GET /api/platform/data` lists `{ name, columns, orderBy }`. 400 `invalid_input` / 401 / 404 before the stream. Mid-stream errors abort and log, never SQL.

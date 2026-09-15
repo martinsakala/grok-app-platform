@@ -25,6 +25,7 @@ export const platformClient = createPlatformClient({
 ```
 
 Typed methods cover every 0.8.0 route plus 0.10.0/0.11.0 design: `me`, `health`, `version`,
+`getRegistry()`,
 `listUsers` / `setUserRoles`, `getAccessPolicy` / `setAccessPolicy`,
 `listApiKeys` / `createApiKey` / `revokeApiKey`, `listSettings` /
 `getSetting` / `setSetting` / `deleteSetting`, `listAudit`,
@@ -46,11 +47,12 @@ Pages take a `client` prop. They must not call `fetch` themselves.
 | Export | Role |
 | --- | --- |
 | `AppShell` | Header, nav (`{label, href}[]`), `userSlot`, main, empty state, `ErrorBoundary`. Optional `tokens` / `designUrl` injects `--pf-*` |
-| `AdminLayout` | `AppShell` plus side nav (default `/admin/*` hrefs, including Data / Mutations / Design) | |
+| `AdminLayout` | `AppShell` plus side nav (default `/admin/*` hrefs, including API / Data / Mutations / Design) | |
 | `StatusPage` | Health, version, `/me`. Compares version to `PLATFORM_VERSION`, never a hardcoded string |
 | `UsersPage` | Admin+: list + role editor. Owner-only edits of owners |
 | `AccessPolicyPage` | Owner: mode, domains, emails |
 | `ApiKeysPage` | Own keys; create shows plaintext once; revoke |
+| `ApiDocsPage` | Member+: capability registry grouped by kind, Copy curl (`$API_KEY`), links to `openapi.json` and `llms.txt` |
 | `SettingsPage` | Member read; admin write; `platform.*` owner |
 | `AuditPage` | Admin+: `before=id` pagination and action/entity filters |
 | `DesignPage` | Owner: Import (paste/upload/Validate/Apply), Gallery (Use), Export (Download `design.md` + copy LLM prompt), Fine-tune, Reset |
@@ -98,6 +100,7 @@ rebuild. Do not invent a second token set in the host. Voice stays in
    app/routes/admin/users.tsx           UsersPage
    app/routes/admin/access-policy.tsx   AccessPolicyPage
    app/routes/admin/api-keys.tsx        ApiKeysPage
+   app/routes/admin/api.tsx             ApiDocsPage
    app/routes/admin/data.tsx            DataResourcesPage
    app/routes/admin/settings.tsx        SettingsPage
    app/routes/admin/mutations.tsx       MutationsPage

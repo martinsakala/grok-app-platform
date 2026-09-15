@@ -99,11 +99,12 @@
 
 23. HTTP extension point (`src/http`):
 
-    * `createPlatformHandler({ appConfig, sessionSource, dataApi, getDatabase, healthExtras, designTokens, designMarkdown, mutations, exportMaxRows })`.
+    * `createPlatformHandler({ appConfig, sessionSource, dataApi, getDatabase, healthExtras, designTokens, designMarkdown, mutations, exportMaxRows, registryPublic, settingsKeys })`.
     * Internal registry of method + path (GET/POST/PUT/DELETE). New capabilities add routes here, not in the host.
     * Prefix `/api/platform`. Host aliases keep `/api/health`, `/api/version`, `/api/data/:resource`.
     * 0.7.0: `/me`, `/admin/users`, `/admin/access-policy`, `/api-keys`. Known path + wrong method is 405.
     * 0.10.0: public `GET /design`; owner `PUT`/`DELETE /design`. `designTokens` is the host's build-time `--pf-*` map.
+    * 0.15.0: public `GET /registry`, `/openapi.json`, `/llms.txt`. Optional `registryPublic: false`.
 
 24. Data API extension point (`src/data-api`):
 
@@ -152,7 +153,7 @@
     * Hosts pass `href` / `onNavigate` / `userSlot`. The platform does not import a router.
     * Tokens live in `src/ui/tokens.css` (`--pf-*`). Tailwind v4 hosts must `@source` this directory.
     * `AppShell` accepts `tokens` / `designUrl` and injects a `<style>` block so GUI overrides apply without rebuild.
-    * Pages include Status, Users, Access, API keys, Data (`DataResourcesPage`), Settings, Mutations, Design, Audit.
+    * Pages include Status, Users, Access, API keys, API docs (`ApiDocsPage`), Data (`DataResourcesPage`), Settings, Mutations, Design, Audit.
     * `appContractVersion` 7. Login UI remains application-owned.
 
 30. Design extension point (`src/design`):
@@ -163,4 +164,12 @@
     * Runtime: `platform.design` (owner JSON subset) merged in `GET /api/platform/design`.
     * Hosts keep `design.md` at the app root, generate `app/design-tokens.css` at build, pass `designTokens` into the handler.
     * Agents read `design.md` before writing UI.
+
+31. Registry extension point (`src/registry`):
+
+    * `buildRegistry` is generated from handler routes, `defineDataApi`, and `defineMutations`. GUI and LLM share it.
+    * Public `GET /api/platform/registry`, `/openapi.json` (OpenAPI 3.1), `/llms.txt`. Optional `registryPublic: false`.
+    * No SQL identifiers, no secrets, no `ownerEmails`. A new host capability is a registration, not a hand-written description.
+    * The JSON is the source for a future MCP server, not an MCP implementation.
+
 

@@ -54,7 +54,7 @@ root host glue = host-owned
 * Do not create `src/routes/auth/popup.tsx`.
 * Better Auth identity tables live in `public` (Grok/Better Auth exception). Canonical schema owner is Grok `migrations/auth/0001_auth.sql`. Platform `0002_auth.sql` is a historical compatibility bootstrap — do not edit it and do not add further Better Auth column-copy migrations.
 * Never log or return access tokens, refresh tokens, session tokens, OAuth secrets, or password hashes.
-* `/api/health`, `/api/version`, `/api/platform/health` and `/api/platform/version` stay public; an unsigned-in visitor is not degraded.
+* `/api/health`, `/api/version`, `/api/platform/health` and `/api/platform/version` stay public; an unsigned-in visitor is not degraded. 0.15.0 `/api/platform/registry`, `/openapi.json`, and `/llms.txt` are also public (description, not data) unless the host sets `registryPublic: false`.
 * Platform HTTP lives in `src/http`. Hosts mount one catch-all; they do not reimplement health/version/data routing.
 * Log through `src/logging`. Never `console.error` platform failures. Never log stacks, connection strings, or tokens.
 * Import `platform/src/auth` only from server-side host code. Login UI is application-owned.
