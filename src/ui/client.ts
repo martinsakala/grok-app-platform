@@ -19,6 +19,7 @@ import type {
   MeResponse,
   MutationRunResult,
   MutationsList,
+  PlatformRegistry,
   Role,
   RunMutationOptions,
   SettingRecord,
@@ -37,6 +38,7 @@ export type PlatformClient = {
   me: () => Promise<MeResponse>;
   health: () => Promise<HealthPayload>;
   version: () => Promise<VersionResponse>;
+  getRegistry: () => Promise<PlatformRegistry>;
   listUsers: () => Promise<UsersList>;
   setUserRoles: (id: string, roles: readonly Role[]) => Promise<{ id: string; roles: Role[] }>;
   getAccessPolicy: () => Promise<AccessPolicy>;
@@ -118,6 +120,7 @@ export function createPlatformClient(options: PlatformClientOptions = {}): Platf
     me: () => request<MeResponse>("/me"),
     health: () => request<HealthPayload>("/health"),
     version: () => request<VersionResponse>("/version"),
+    getRegistry: () => request<PlatformRegistry>("/registry"),
     listUsers: () => request<UsersList>("/admin/users"),
     setUserRoles: (id, roles) =>
       request<{ id: string; roles: Role[] }>(`/admin/users/${encodeURIComponent(id)}/roles`, {

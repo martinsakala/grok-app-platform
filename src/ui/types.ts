@@ -8,8 +8,9 @@ import type { DesignOverride, DesignSource, DesignTokens, ColorTokens } from "..
 import type { ListedMutation, MutationInputErrorItem } from "../mutations/index.js";
 import type { HealthResponse, VersionResponse } from "../runtime/types.js";
 import type { SettingRecord } from "../settings/settings.js";
+import type { Capability, PlatformRegistry } from "../registry/types.js";
 
-export type { Role, AccessPolicy, ListedUser, ApiKeyView, CreatedApiKey, AuditEntry, ListResourceResult, HealthResponse, VersionResponse, SettingRecord, DesignOverride, DesignTokens, DesignSource, ListedMutation, MutationInputErrorItem };
+export type { Role, AccessPolicy, ListedUser, ApiKeyView, CreatedApiKey, AuditEntry, ListResourceResult, HealthResponse, VersionResponse, SettingRecord, DesignOverride, DesignTokens, DesignSource, ListedMutation, MutationInputErrorItem, Capability, PlatformRegistry };
 
 export type DesignResponse = {
   tokens: DesignTokens;

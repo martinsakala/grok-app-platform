@@ -10,6 +10,7 @@ import { AuditPage } from "../src/ui/AuditPage.js";
 import { DesignPage } from "../src/ui/DesignPage.js";
 import { MutationsPage } from "../src/ui/MutationsPage.js";
 import { DataResourcesPage } from "../src/ui/DataResourcesPage.js";
+import { ApiDocsPage } from "../src/ui/ApiDocsPage.js";
 import { ErrorBoundary } from "../src/ui/ErrorBoundary.js";
 import { PlatformClientError } from "../src/ui/errors.js";
 import { SettingsPage } from "../src/ui/SettingsPage.js";
@@ -49,6 +50,7 @@ function unusedClient(): PlatformClient {
     runMutation: fail,
     listDataResources: fail,
     exportData: fail,
+    getRegistry: fail,
   };
 }
 
@@ -100,6 +102,8 @@ describe("platform UI pages", () => {
     expect(admin).toContain('href="/admin/mutations"');
     expect(admin).toContain("Data");
     expect(admin).toContain('href="/admin/data"');
+    expect(admin).toContain("API");
+    expect(admin).toContain('href="/admin/api"');
     const withTokens = renderToString(
       <AppShell appName="mother-app" tokens={{ "--pf-bg": "#111111", "--pf-accent": "#abcdef" }}>
         <p>Hello</p>
@@ -403,6 +407,67 @@ describe("platform UI pages", () => {
     expect(data).toContain("owned-items");
     expect(data).toContain("Export CSV");
     expect(data).toContain("Export NDJSON");
+  });
+
+  it("ApiDocsPage groups capabilities and shows Copy curl", () => {
+    expect(renderToString(<ApiDocsPage client={client} preview={{ status: "loading" }} />)).toContain(
+      "Loading API",
+    );
+    expect(renderToString(<ApiDocsPage client={client} preview={{ status: "forbidden" }} />)).toContain(
+      "Member role required",
+    );
+    const html = renderToString(
+      <ApiDocsPage
+        client={client}
+        preview={{
+          status: "data",
+          me: member,
+          registry: {
+            platformVersion: PLATFORM_VERSION,
+            appContractVersion: 7,
+            application: { name: "mother-app", version: "0.1.0" },
+            auth: {
+              schemes: [{ type: "apiKey", header: "Authorization", format: "Bearer gk_...", howToGet: "/admin/api-keys" }],
+              roles: ["owner", "admin", "member"],
+            },
+            capabilities: [
+              {
+                id: "me.get",
+                kind: "read",
+                method: "GET",
+                path: "/api/platform/me",
+                roles: ["member"],
+                description: "Current principal",
+                input: null,
+                output: { type: "object" },
+                pagination: null,
+              },
+              {
+                id: "mutation.create-note",
+                kind: "write",
+                method: "POST",
+                path: "/api/platform/mutations/create-note",
+                roles: ["member"],
+                description: "Create a note",
+                input: { type: "object", properties: { text: { type: "string" } } },
+                output: { type: "object" },
+                pagination: null,
+              },
+            ],
+          },
+        }}
+      />,
+    );
+    expect(html).toContain("data-api-docs-page");
+    expect(html).toContain("openapi.json");
+    expect(html).toContain("llms.txt");
+    expect(html).toContain("$API_KEY");
+    expect(html).toContain("Copy curl");
+    expect(html).toContain("/api/platform/me");
+    expect(html).toContain("create-note");
+    expect(html).toContain("Idempotency-Key");
+    expect(html).toContain("data-api-docs-kind=\"read\"");
+    expect(html).toContain("data-api-docs-kind=\"write\"");
   });
 
   it("member UsersPage 403 vs owner data; client error mapping 403", () => {

@@ -48,6 +48,13 @@ import {
 } from "../settings/index.js";
 import { getVersionResponse } from "../runtime/version.js";
 import { readJsonBody } from "./json.js";
+import {
+  buildLlmsTxt,
+  buildOpenApi,
+  buildRegistry,
+  etagFor,
+  ifNoneMatch,
+} from "../registry/index.js";
 
 const logger = createLogger("http");
 const PLATFORM_PREFIX = "/api/platform";
@@ -67,6 +74,13 @@ export type PlatformHandlerOptions = {
   mutations?: MutationRegistry;
   /** Hard cap for data exports. Setting `platform.export.max-rows` may only lower it. Default 100000. */
   exportMaxRows?: number;
+  /**
+   * When false, GET /registry, /openapi.json and /llms.txt require a principal.
+   * Default true (public — they describe capabilities, not data).
+   */
+  registryPublic?: boolean;
+  /** Optional advertised setting keys (names only) included in the registry. */
+  settingsKeys?: readonly string[];
 };
 
 type RouteParams = Record<string, string>;
@@ -85,6 +99,8 @@ type Route = {
   pattern: string;
   handler: (ctx: RouteContext) => Promise<Response>;
 };
+
+export type PlatformHttpRoute = { method: HttpMethod; pattern: string };
 
 function json(body: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
   return Response.json(body, {
@@ -167,6 +183,76 @@ async function healthRoute(ctx: RouteContext): Promise<Response> {
 
 function versionRoute(ctx: RouteContext): Promise<Response> {
   return Promise.resolve(json(getVersionResponse(ctx.options.appConfig)));
+}
+
+function registryOf(options: PlatformHandlerOptions) {
+  return buildRegistry({
+    appConfig: options.appConfig,
+    dataApi: options.dataApi,
+    mutations: options.mutations,
+    settingsKeys: options.settingsKeys,
+    designMarkdownPresent: Boolean(options.designMarkdown),
+  });
+}
+
+function cachedDocument(
+  request: Request,
+  body: string,
+  contentType: string,
+  publiclyCacheable: boolean,
+): Response {
+  const etag = etagFor(body);
+  const cacheControl = publiclyCacheable ? "public, max-age=300" : "no-store";
+  if (ifNoneMatch(request, etag)) {
+    return new Response(null, { status: 304, headers: { etag, "cache-control": cacheControl } });
+  }
+  return new Response(body, {
+    status: 200,
+    headers: {
+      etag,
+      "cache-control": cacheControl,
+      "content-type": contentType,
+    },
+  });
+}
+
+async function requireRegistryAccess(ctx: RouteContext): Promise<void> {
+  if (ctx.options.registryPublic === false) {
+    await principalOf(ctx);
+  }
+}
+
+async function registryRoute(ctx: RouteContext): Promise<Response> {
+  await requireRegistryAccess(ctx);
+  const body = JSON.stringify(registryOf(ctx.options));
+  return cachedDocument(
+    ctx.request,
+    body,
+    "application/json; charset=utf-8",
+    ctx.options.registryPublic !== false,
+  );
+}
+
+async function openapiRoute(ctx: RouteContext): Promise<Response> {
+  await requireRegistryAccess(ctx);
+  const body = JSON.stringify(buildOpenApi(registryOf(ctx.options)));
+  return cachedDocument(
+    ctx.request,
+    body,
+    "application/json; charset=utf-8",
+    ctx.options.registryPublic !== false,
+  );
+}
+
+async function llmsRoute(ctx: RouteContext): Promise<Response> {
+  await requireRegistryAccess(ctx);
+  const body = buildLlmsTxt(registryOf(ctx.options));
+  return cachedDocument(
+    ctx.request,
+    body,
+    "text/plain; charset=utf-8",
+    ctx.options.registryPublic !== false,
+  );
 }
 
 async function dataRoute(ctx: RouteContext): Promise<Response> {
@@ -526,6 +612,9 @@ async function runMutationRoute(ctx: RouteContext): Promise<Response> {
 const routes: Route[] = [
   { method: "GET", pattern: "/health", handler: healthRoute },
   { method: "GET", pattern: "/version", handler: versionRoute },
+  { method: "GET", pattern: "/registry", handler: registryRoute },
+  { method: "GET", pattern: "/openapi.json", handler: openapiRoute },
+  { method: "GET", pattern: "/llms.txt", handler: llmsRoute },
   { method: "GET", pattern: "/design/gallery", handler: galleryDesignRoute },
   { method: "GET", pattern: "/design/export", handler: exportDesignRoute },
   { method: "POST", pattern: "/design/import", handler: importDesignRoute },
@@ -551,6 +640,10 @@ const routes: Route[] = [
   { method: "GET", pattern: "/mutations", handler: listMutationsRoute },
   { method: "POST", pattern: "/mutations/:name", handler: runMutationRoute },
 ];
+
+export function listPlatformHttpRoutes(): readonly PlatformHttpRoute[] {
+  return routes.map((route) => ({ method: route.method, pattern: route.pattern }));
+}
 
 function methodsForPath(rest: string): { methods: HttpMethod[]; params: RouteParams } | null {
   const methods: HttpMethod[] = [];

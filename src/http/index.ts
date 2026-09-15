@@ -1,1 +1,7 @@
-export { createPlatformHandler, type PlatformHandlerOptions } from "./handler.js";
+export {
+  createPlatformHandler,
+  listPlatformHttpRoutes,
+  type PlatformHandlerOptions,
+  type PlatformHttpRoute,
+} from "./handler.js";
+

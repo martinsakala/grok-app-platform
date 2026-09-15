@@ -227,4 +227,21 @@ describe("createPlatformClient", () => {
     expect(exported.ok).toBe(true);
     expect(await exported.text()).toBe("id\n1\n");
   });
+
+  it("getRegistry GETs /registry", async () => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe("/api/platform/registry");
+      return jsonResponse(200, {
+        platformVersion: "0.15.0",
+        appContractVersion: 7,
+        application: { name: "t", version: "0.0.0" },
+        auth: { schemes: [], roles: ["member"] },
+        capabilities: [],
+      });
+    });
+    const client = createPlatformClient({ fetch: fetchFn as unknown as typeof fetch });
+    const registry = await client.getRegistry();
+    expect(registry.application.name).toBe("t");
+    expect(registry.appContractVersion).toBe(7);
+  });
 });

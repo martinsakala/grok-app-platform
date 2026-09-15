@@ -13,6 +13,7 @@ export { AuditPage, type AuditPreview } from "./AuditPage.js";
 export { DesignPage, type DesignPreview } from "./DesignPage.js";
 export { MutationsPage, type MutationsPreview } from "./MutationsPage.js";
 export { DataResourcesPage, type DataResourcesPreview } from "./DataResourcesPage.js";
+export { ApiDocsPage, curlForCapability, type ApiDocsPreview } from "./ApiDocsPage.js";
 export type {
   MeResponse,
   NavItem,
@@ -32,4 +33,6 @@ export type {
   DataResourcesList,
   ListedDataResource,
   ExportDataQuery,
+  PlatformRegistry,
+  Capability,
 } from "./types.js";

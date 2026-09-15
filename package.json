@@ -16,7 +16,8 @@
     "./audit": "./src/audit/index.ts",
     "./ui": "./src/ui/index.ts",
     "./design": "./src/design/index.ts",
-    "./mutations": "./src/mutations/index.ts"
+    "./mutations": "./src/mutations/index.ts",
+    "./registry": "./src/registry/index.ts"
   },
   "scripts": {
     "generate:version": "node scripts/generate-platform-version.mjs",
